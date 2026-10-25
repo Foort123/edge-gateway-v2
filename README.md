@@ -7,6 +7,7 @@ Cloudflare Pages Function for VLESS over WebSocket with TCP forwarding.
 - Build command: empty
 - Build output directory: public
 - Pages Function route: /ws
+- Production branch: main; pushes trigger a Pages build.
 
 Set ACCESS_UUID as a Pages environment variable (secret text recommended).
 
