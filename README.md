@@ -11,16 +11,22 @@ Cloudflare Pages Function for VLESS over WebSocket with TCP forwarding.
 
 Set ACCESS_UUID as a Pages environment variable (secret text recommended).
 
-## HTTP CONNECT upstream
+## Outbound proxy routing
 
-Cloudflare Workers blocks outbound TCP sockets to Cloudflare IP ranges. To reach destinations hosted behind Cloudflare, configure a real upstream HTTP CONNECT proxy in the Pages environment:
+Cloudflare Workers blocks outbound TCP sockets to Cloudflare IP ranges. The function first attempts a direct TCP connection and falls back when it fails.
 
-- OUTBOUND_PROXY_IP: one endpoint or a comma-separated ordered pool, such as https://proxy.example.net:8443,http://proxy2.example.net:3128
-- OUTBOUND_PROXY_USERNAME and OUTBOUND_PROXY_PASSWORD: optional proxy credentials
-- OUTBOUND_PROXY_MODE: fallback (default, direct first) or always (route every destination through the upstream pool)
+By default, the fallback pool uses raw TCP/SNI ProxyIP relays:
 
-For https proxy endpoints, the gateway establishes TLS to the proxy before sending CONNECT. The destination TLS ClientHello is then passed through the tunnel unchanged, preserving the client's target SNI.
+- proxyip.fxxk.dedyn.io:443
+- proxyip.cmliussss.net:443
 
-The public ProxyIP/SNI relay hosts from earlier examples are not HTTP CONNECT services, so they are intentionally not included as default CONNECT endpoints. Supply an upstream you control or have permission to use. Without OUTBOUND_PROXY_IP, the gateway can only connect directly and Cloudflare-hosted destinations may fail.
+These endpoints do not use HTTP CONNECT. The gateway opens a plain TCP socket to each relay and forwards the client's TLS ClientHello unchanged so the relay can route by the destination SNI. This mode is for TLS destinations on port 443.
 
-Only binary WebSocket frames and VLESS TCP requests are supported.
+Configure these Pages variables to override or change the behavior:
+
+- OUTBOUND_PROXY_IP: comma-separated ordered endpoints. For raw ProxyIP mode, use host:port entries. For HTTP CONNECT mode, use http://host:port or https://host:port.
+- OUTBOUND_PROXY_PROTOCOL: proxyip (default) or http-connect.
+- OUTBOUND_PROXY_MODE: fallback (default, direct first) or always (route every destination through the configured proxy pool).
+- OUTBOUND_PROXY_USERNAME and OUTBOUND_PROXY_PASSWORD: optional credentials for HTTP CONNECT proxies.
+
+Public relay availability can change. The relay operator can observe the target SNI and connection metadata. Use only endpoints you trust. Only binary WebSocket frames and VLESS TCP requests are supported.

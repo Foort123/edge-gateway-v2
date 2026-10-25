@@ -3,6 +3,7 @@ import { connect } from "cloudflare:sockets";
 const MAX_VLESS_HEADER_BYTES = 1024;
 const MAX_CONNECT_HEADER_BYTES = 16 * 1024;
 const CONNECT_TIMEOUT_MS = 8000;
+const DEFAULT_PROXYIP_ENDPOINTS = ["proxyip.fxxk.dedyn.io:443", "proxyip.cmliussss.net:443"];
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
@@ -347,7 +348,18 @@ function isBlockedIpLiteral(host) {
 }
 
 async function connectToTarget(target, env) {
-  const proxies = parseProxyEndpoints(env.OUTBOUND_PROXY_IP);
+  const protocol = String(env.OUTBOUND_PROXY_PROTOCOL || "proxyip").trim().toLowerCase();
+  if (protocol !== "proxyip" && protocol !== "http-connect") {
+    throw new Error("OUTBOUND_PROXY_PROTOCOL must be proxyip or http-connect");
+  }
+
+  const configuredProxies = parseProxyEndpoints(env.OUTBOUND_PROXY_IP, protocol);
+  const proxies =
+    configuredProxies.length > 0
+      ? configuredProxies
+      : protocol === "proxyip"
+        ? parseProxyEndpoints(DEFAULT_PROXYIP_ENDPOINTS.join(","), "proxyip")
+        : [];
   const mode = String(env.OUTBOUND_PROXY_MODE || "fallback").trim().toLowerCase();
 
   if (mode !== "fallback" && mode !== "always") {
@@ -356,21 +368,20 @@ async function connectToTarget(target, env) {
 
   if (mode === "always") {
     if (proxies.length === 0) {
-      throw new Error("OUTBOUND_PROXY_IP is required when OUTBOUND_PROXY_MODE is always");
+      throw new Error("No outbound proxy endpoints are configured");
     }
-    return openProxyPool(proxies, target, null, env);
+    return openProxyPool(proxies, target, protocol, env);
   }
 
   try {
     return await openDirectTarget(target);
   } catch (directError) {
     if (proxies.length === 0) {
-      throw new Error("Direct TCP failed; configure OUTBOUND_PROXY_IP with a real HTTP CONNECT proxy");
+      throw new Error("Direct TCP failed and no outbound proxy endpoints are available");
     }
-    return openProxyPool(proxies, target, directError, env);
+    return openProxyPool(proxies, target, protocol, env, directError);
   }
 }
-
 async function openDirectTarget(target) {
   const socket = connect(
     { hostname: target.host, port: target.port },
@@ -392,7 +403,7 @@ async function openDirectTarget(target) {
   }
 }
 
-function parseProxyEndpoints(value) {
+function parseProxyEndpoints(value, protocol) {
   if (typeof value !== "string" || value.trim() === "") return [];
 
   return value
@@ -400,32 +411,44 @@ function parseProxyEndpoints(value) {
     .map((entry) => entry.trim())
     .filter(Boolean)
     .map((entry) => {
-      const url = new URL(entry.includes("://") ? entry : "http://" + entry);
-      if (url.protocol !== "http:" && url.protocol !== "https:") {
-        throw new Error("Upstream proxy must use http:// or https://");
+      const hasScheme = entry.includes("://");
+      if (protocol === "proxyip" && hasScheme) {
+        throw new Error("Use host:port entries for raw ProxyIP endpoints");
+      }
+
+      const url = new URL(hasScheme ? entry : "http://" + entry);
+      if (protocol === "http-connect" && url.protocol !== "http:" && url.protocol !== "https:") {
+        throw new Error("HTTP CONNECT upstream must use http:// or https://");
       }
       if (url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
         throw new Error("Set proxy credentials with OUTBOUND_PROXY_USERNAME and OUTBOUND_PROXY_PASSWORD");
       }
 
       const hostname = url.hostname.replace(/^\[|\]$/g, "");
-      const port = url.port ? Number(url.port) : url.protocol === "https:" ? 443 : 80;
+      const port = url.port ? Number(url.port) : protocol === "proxyip" ? 0 : url.protocol === "https:" ? 443 : 80;
       if (!hostname || !Number.isInteger(port) || port < 1 || port > 65535) {
-        throw new Error("Invalid OUTBOUND_PROXY_IP entry");
+        throw new Error("Invalid OUTBOUND_PROXY_IP entry; use host:port");
       }
 
       return {
         hostname,
         port,
-        secure: url.protocol === "https:",
+        secure: protocol === "http-connect" && url.protocol === "https:",
       };
     });
 }
 
-async function openProxyPool(proxies, target, directError, env) {
+async function openProxyPool(proxies, target, protocol, env, directError) {
+  if (protocol === "proxyip" && target.port !== 443) {
+    throw new Error("Raw ProxyIP SNI routing supports TLS destinations on port 443");
+  }
+
   const failures = [];
   for (const proxy of proxies) {
     try {
+      if (protocol === "proxyip") {
+        return await openProxyIpTarget(proxy);
+      }
       return await openConnectTunnel(proxy, target, env);
     } catch (error) {
       failures.push(error?.message || String(error));
@@ -433,9 +456,29 @@ async function openProxyPool(proxies, target, directError, env) {
   }
 
   const cause = failures.length > 0 ? failures[failures.length - 1] : directError?.message;
-  throw new Error("All configured HTTP CONNECT upstreams failed" + (cause ? ": " + cause : ""));
+  throw new Error("All configured outbound proxies failed" + (cause ? ": " + cause : ""));
 }
 
+async function openProxyIpTarget(proxy) {
+  const socket = connect(
+    { hostname: proxy.hostname, port: proxy.port },
+    { allowHalfOpen: true },
+  );
+
+  try {
+    await socket.opened;
+    return {
+      socket,
+      readable: socket.readable,
+      writable: socket.writable,
+    };
+  } catch (error) {
+    await socket.close().catch(() => {
+      // A failed ProxyIP socket may already be closed.
+    });
+    throw error;
+  }
+}
 async function openConnectTunnel(proxy, target, env) {
   const socket = connect(
     { hostname: proxy.hostname, port: proxy.port },
