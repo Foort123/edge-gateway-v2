@@ -93,7 +93,11 @@ export function attachVlessSession(server, {
     queuedBytes += size;
     const task = messageQueue
       .then(async () => {
-        if (terminated || peerClosed) return;
+        // WebSocket message events already queued before the close event are
+        // still valid TCP input. Drain them before half-closing the destination.
+        // If the request has not established a TCP stream yet, don't start it
+        // after the client has gone away.
+        if (terminated || (peerClosed && mode !== "tcp")) return;
         const chunk = await toUint8Array(event.data);
         if (chunk.byteLength > 0) await processChunk(chunk);
       })

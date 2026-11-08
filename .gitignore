@@ -4,6 +4,7 @@
 !.env.example
 .wrangler/
 node_modules/
+_worker.bundle
 __pycache__/
 *.py[cod]
 .DS_Store

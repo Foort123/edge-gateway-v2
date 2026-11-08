@@ -93,6 +93,47 @@ test("TCP forwards both directions, drains queued writes, then closes on peer cl
   await session.close();
 });
 
+test("WebSocket close drains TCP frames that were queued before the close event", async () => {
+  const server = new FakeWebSocket();
+  const writes = [];
+  let releaseFirstWrite;
+  let firstWriteStarted;
+  const firstWriteStartedPromise = new Promise((resolve) => { firstWriteStarted = resolve; });
+  let writerClosed = false;
+  let socketClosed = false;
+  const socket = {
+    opened: Promise.resolve(),
+    readable: new ReadableStream(),
+    writable: new WritableStream({
+      async write(chunk) {
+        writes.push(new TextDecoder().decode(chunk));
+        if (writes.length === 1) {
+          firstWriteStarted();
+          await new Promise((resolve) => { releaseFirstWrite = resolve; });
+        }
+      },
+      close() { writerClosed = true; },
+    }),
+    close() { socketClosed = true; return Promise.resolve(); },
+  };
+  const session = attachVlessSession(server, {
+    env: { ACCESS_UUID: uuidText },
+    connect: () => socket,
+  });
+
+  const encoder = new TextEncoder();
+  server.message(join(vlessHeader({ command: 1, host: "8.8.8.8", port: 443, uuid }), encoder.encode("first")));
+  await firstWriteStartedPromise;
+  server.message(encoder.encode("queued"));
+  server.peerClose();
+  releaseFirstWrite();
+
+  await waitFor(() => socketClosed);
+  assert.deepEqual(writes, ["first", "queued"]);
+  assert.equal(writerClosed, true);
+  await session.close();
+});
+
 test("WebSocket close during TCP connect closes the late socket without replying", async () => {
   const server = new FakeWebSocket();
   let resolveOpened;
