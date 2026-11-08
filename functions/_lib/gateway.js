@@ -23,6 +23,7 @@ export function attachVlessSession(server, {
   fetchImpl = fetch,
   expectedUuid = parseConfiguredUuid(env.ACCESS_UUID),
   waitUntil = () => {},
+  logger = console,
 }) {
   let headerBytes = new Uint8Array(0);
   let mode = null;
@@ -67,15 +68,28 @@ export function attachVlessSession(server, {
     if (closePeer && server.readyState === 1) {
       try { server.close(code, String(reason).slice(0, 100)); } catch {}
     }
+    logger.info({
+      service: "edge-gateway-v2",
+      event: "session_closed",
+      mode: mode || "unclassified",
+      closeCode: code,
+    });
   };
 
   const fail = (error) => {
     const code = error instanceof ClientProtocolError ? error.closeCode : 1011;
     const reason = error instanceof AuthenticationError ? "Unauthorized" :
       error instanceof ClientProtocolError ? error.message : "Gateway connection failed";
-    if (!(error instanceof AuthenticationError)) {
-      console.error("V2 tunnel closed", error instanceof Error ? error.message : "unknown error");
-    }
+    logger.error({
+      service: "edge-gateway-v2",
+      event: error instanceof AuthenticationError ? "authentication_failed" : "session_failed",
+      category: error instanceof AuthenticationError
+        ? "unauthorized"
+        : error instanceof ClientProtocolError
+          ? "client_protocol"
+          : "upstream",
+      errorType: error instanceof Error ? error.name : "UnknownError",
+    });
     return terminate(code, reason);
   };
 
@@ -127,7 +141,11 @@ export function attachVlessSession(server, {
             server.send(frameVlessUdpPacket(answer));
           }
         } catch (error) {
-          console.error("V2 DoH query failed; dropping DNS response", error instanceof Error ? error.message : "unknown error");
+          logger.error({
+            service: "edge-gateway-v2",
+            event: "dns_query_failed",
+            errorType: error instanceof Error ? error.name : "UnknownError",
+          });
         }
       }
       return;
@@ -158,6 +176,7 @@ export function attachVlessSession(server, {
       socketReader = socket.readable.getReader();
       socketWriter = socket.writable.getWriter();
       mode = "tcp";
+      logger.info({ service: "edge-gateway-v2", event: "session_opened", mode });
       server.send(Uint8Array.of(parsed.version, 0));
       const pump = pumpTcpToWebSocket(connected.prebuffer || new Uint8Array(0));
       schedule(pump);
@@ -170,6 +189,7 @@ export function attachVlessSession(server, {
     } else {
       mode = "udp-drop";
     }
+    logger.info({ service: "edge-gateway-v2", event: "session_opened", mode });
     server.send(Uint8Array.of(parsed.version, 0));
     if (mode === "udp-doh" && initialPayload.byteLength > 0) {
       await processChunk(initialPayload);

@@ -163,14 +163,18 @@ test("WebSocket close during TCP connect closes the late socket without replying
 test("bad UUID closes the session with policy code without opening TCP", async () => {
   const server = new FakeWebSocket();
   let connected = false;
+  const logs = [];
   attachVlessSession(server, {
     env: { ACCESS_UUID: uuidText },
     connect: () => { connected = true; throw new Error("must not connect"); },
+    logger: { error: (record) => logs.push(record), info: (record) => logs.push(record) },
   });
   const wrongUuid = parseConfiguredUuid("26a93e4c-3af1-4fb3-a537-439a1c725ab5");
   server.message(vlessHeader({ command: 1, host: "1.1.1.1", port: 443, uuid: wrongUuid }));
   await waitFor(() => server.closeCode === 1008);
   assert.equal(connected, false);
+  assert.equal(logs[0].event, "authentication_failed");
+  assert.equal(JSON.stringify(logs).includes(uuidText), false);
 });
 
 test("Pages handler serves static assets and an ordinary browser response", async () => {
@@ -183,6 +187,37 @@ test("Pages handler serves static assets and an ordinary browser response", asyn
   assert.equal(browser.status, 200);
   assert.match(await browser.text(), /VLESS поверх WebSocket/);
   assert.equal(nextCalls, 1);
+});
+
+test("health reports configuration readiness without exposing the access UUID", async () => {
+  const handler = createPagesHandler({
+    connect: () => {},
+    WebSocketPairCtor: class WebSocketPairStub {},
+  });
+  const request = new Request("https://gateway.example/health");
+  const ready = await handler({ request, env: { ACCESS_UUID: uuidText }, next: async () => new Response("next") });
+  const payload = await ready.json();
+
+  assert.equal(ready.status, 200);
+  assert.equal(payload.status, "ok");
+  assert.deepEqual(payload.checks, {
+    accessUuidConfigured: true,
+    tcpSocketApiAvailable: true,
+    webSocketPairAvailable: true,
+    fetchAvailable: true,
+  });
+  assert.equal(JSON.stringify(payload).includes(uuidText), false);
+
+  const unconfigured = await handler({ request, env: {}, next: async () => new Response("next") });
+  assert.equal(unconfigured.status, 503);
+  assert.equal((await unconfigured.json()).status, "not_ready");
+
+  const methodNotAllowed = await handler({
+    request: new Request("https://gateway.example/health", { method: "POST" }),
+    env: { ACCESS_UUID: uuidText },
+    next: async () => new Response("next"),
+  });
+  assert.equal(methodNotAllowed.status, 405);
 });
 
 test("Pages handler validates upgrade and environment before accepting a socket", async () => {

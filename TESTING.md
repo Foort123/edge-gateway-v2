@@ -12,6 +12,8 @@ wire-format limit, public-address filtering, TCP stream behavior and
 socket close cleanup, UDP handling, Pages request routing, and configuration
 samples. The suite also verifies that TCP failover races validated public DNS
 answers, closes failed and losing sockets, and caps attempts at four addresses.
+It verifies `/health` readiness and confirms its response does not expose the
+access UUID. Latest result on 2026-11-08: **30/30 tests passed**.
 
 ## Production verification
 
@@ -53,16 +55,18 @@ The same local harness downloaded `/files/10Mb.dat` from `proof.ovh.net` in
 three runs; see [BENCHMARKS.md](BENCHMARKS.md) for timings and the test
 environment. These measurements are not production performance evidence.
 
-On 2026-11-08, the current local Pages source also passed the reusable TCP smoke
-test against `www.wikipedia.org:443` (`HTTP/1.1 200 OK`, 23.3 ms WebSocket open,
-220.4 ms TLS ready, 180.8 ms TTFB). It transferred a 122,421-byte response in
-198.7 ms; this small response is not a throughput benchmark.
+On 2026-11-08, the updated local Pages source returned `GET /health` with
+`200 OK` and no UUID in the response. The reusable TCP smoke test against
+`www.wikipedia.org:443` returned `HTTP/1.1 200 OK` (16.3 ms WebSocket open,
+216.1 ms TLS ready, 178.7 ms TTFB). It transferred a 122,421-byte response in
+200.1 ms; this small response is not a throughput benchmark.
 
 The added `npm run test:e2e:dns` check sent a local VLESS UDP/53 request for
 `example.com` through the Pages Function and received a 61-byte DNS response
 with two answer records. This verifies the current local DoH route; the script
 does not identify which resolver answered. Unit tests separately verify the
-Cloudflare-first order and Google's failover behavior.
+Cloudflare-first order and Google's failover behavior. Structured session logs
+were visible in the local Wrangler output and contained mode and close code only.
 
 To repeat both local checks, start `wrangler pages dev` as above, set the same
 throwaway UUID in a second PowerShell terminal, then run:

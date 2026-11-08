@@ -1,1 +1,1 @@
-{"version": 1, "include": ["/", "/ws", "/ws/*"], "exclude": []}
+{"version": 1, "include": ["/", "/health", "/ws", "/ws/*"], "exclude": []}

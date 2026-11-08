@@ -6,6 +6,8 @@
   DNS; skip Google's wire-format endpoint for DNS messages over 512 bytes.
 - Add a repeatable local VLESS UDP/53 end-to-end smoke test and cover resolver
   failover behavior in unit tests.
+- Add a configuration-only `/health` endpoint and structured privacy-safe
+  session/error logs.
 - Race TCP connects to up to four validated public DNS answers, keep the first
   successful socket, and close the remaining sockets.
 - Drain TCP frames already queued before WebSocket close, then close the outbound

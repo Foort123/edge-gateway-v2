@@ -38,6 +38,9 @@ Therefore:
   deployment; blocked-site access is not achieved.
 - Arbitrary UDP and ICMP are unavailable through this design.
 - Outbound sockets to Cloudflare IP ranges are restricted.
+- `GET /health` checks configuration and runtime bindings, not destination
+  egress. Structured runtime logs omit UUIDs, destination addresses, and DNS
+  payloads; alert delivery is not configured.
 - A separate CONNECT server or public relay could add an external hop, but it
   is outside the selected Pages-only architecture and is not configured.
 - Do not claim a passing DNS query or an HTTP 200 page proves the gateway works

@@ -16,6 +16,11 @@
   bytes.
 - No public ProxyIP pool or external CONNECT proxy is selected automatically.
   The current Pages-only path does not depend on third-party relay credentials.
+- Structured runtime events report session modes, close codes, and error
+  categories. They omit access UUIDs, destination addresses, client IPs, and
+  DNS packet contents.
+- The public `/health` response reports boolean readiness checks; it does not
+  disclose the configured UUID or test outbound connectivity.
 
 ## Platform and protocol limits
 

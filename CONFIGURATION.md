@@ -14,6 +14,10 @@ The VLESS client connects to the Pages hostname over TLS and WebSocket path
 /ws. A successful DNS query does not imply that ordinary sites can be
 reached through the tunnel.
 
+`GET /health` reports whether `ACCESS_UUID`, `cloudflare:sockets`, the
+WebSocket API, and `fetch` are available. A healthy response does not prove
+that Cloudflare permits a TCP connection to any particular destination.
+
 ## Hiddify / Xray client profile
 
 After Cloudflare clears the project block and the V2 production `ACCESS_UUID`

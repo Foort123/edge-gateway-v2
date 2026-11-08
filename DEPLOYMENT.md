@@ -47,6 +47,13 @@ behavior separately. The current production check showed that direct TCP to
 example.com:443 fails in the Pages runtime, so do not claim ordinary web
 browsing based on the DNS test.
 
+The new source also provides `GET /health`, which checks configuration and
+runtime bindings only. It does not test TCP egress. The handler emits structured
+session and error logs without UUIDs, client IPs, destination addresses, or DNS
+payloads. Cloudflare documents live logs in the Workers & Pages dashboard and
+through Wrangler; console messages from WebSocket handlers may be buffered
+until the WebSocket closes. No external alert target is configured.
+
 The Pages-only gateway supports DNS UDP/53 over DoH and TCP only where the
 runtime permits it. It does not provide arbitrary UDP or ICMP. V1's main branch
 and Pages production remain unchanged, but a temporary agent-created V1 branch

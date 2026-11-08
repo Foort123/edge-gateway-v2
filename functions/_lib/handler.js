@@ -5,6 +5,7 @@ const BROWSER_INFO = `<!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Edge Gateway V2 — Pages TCP/DNS</title></head><body><main><h1>Edge Gateway V2</h1>
 <p>Этот endpoint принимает VLESS поверх WebSocket на <code>/ws</code>.</p>
+<p>Состояние конфигурации можно проверить запросом <code>/health</code>; он не проверяет доступность целевых TCP-сайтов.</p>
 <p>Поддерживаются DNS UDP/53 через DoH и TCP только к адресам и портам, разрешённым Cloudflare Pages.</p>
 <p>Другой UDP и ICMP не поддерживаются. В production прямое TCP-подключение к HTTPS-порту 443 завершилось ошибкой runtime, поэтому обычный веб-трафик не гарантирован.</p></main></body></html>`;
 
@@ -13,10 +14,35 @@ export function createPagesHandler({
   fetchImpl = fetch,
   WebSocketPairCtor = globalThis.WebSocketPair,
   upgradeResponse = (client) => new Response(null, { status: 101, webSocket: client }),
+  logger = console,
 } = {}) {
   return async function onRequest(context) {
     const { request, env = {}, next } = context;
     const url = new URL(request.url);
+    if (url.pathname === "/health") {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return new Response("Method not allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
+      }
+
+      const checks = {
+        accessUuidConfigured: parseConfiguredUuid(env.ACCESS_UUID) !== null,
+        tcpSocketApiAvailable: typeof connect === "function",
+        webSocketPairAvailable: typeof WebSocketPairCtor === "function",
+        fetchAvailable: typeof fetchImpl === "function",
+      };
+      const ready = Object.values(checks).every(Boolean);
+      return new Response(request.method === "HEAD" ? null : JSON.stringify({
+        service: "edge-gateway-v2",
+        status: ready ? "ok" : "not_ready",
+        checks,
+      }), {
+        status: ready ? 200 : 503,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+        },
+      });
+    }
     if (url.pathname !== "/ws") return next();
 
     if (request.method !== "GET") {
@@ -51,11 +77,16 @@ export function createPagesHandler({
         env,
         connect,
         fetchImpl,
+        logger,
         waitUntil: (promise) => context.waitUntil?.(promise),
       });
       return upgradeResponse(client);
     } catch (error) {
-      console.error("V2 WebSocket setup failed", error instanceof Error ? error.message : "unknown error");
+      logger.error({
+        service: "edge-gateway-v2",
+        event: "websocket_setup_failed",
+        errorType: error instanceof Error ? error.name : "UnknownError",
+      });
       return new Response("WebSocket setup failed", { status: 500 });
     }
   };

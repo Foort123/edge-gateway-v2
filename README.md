@@ -16,6 +16,8 @@ full-device VPN**.
 - If fallback is used, Google receives that DNS query and the Pages egress
   address. Google wire-format fallback is skipped for DNS messages over 512
   bytes.
+- `GET /health` reports whether the auth secret and runtime APIs are configured;
+  it does not probe destination connectivity.
 - A production connection to example.com:443 failed with Cloudflare's
   HTTP-based socket restriction. Ordinary HTTPS browsing and access to blocked
   websites therefore do not work reliably in this Pages-only design.
@@ -26,6 +28,11 @@ See [RESEARCH.md](RESEARCH.md) for the official platform-source review, the
 architecture comparison, and the data-path diagram. The current project is a
 limited prototype; the acceptance status and unverified production items are
 listed in [TESTING.md](TESTING.md).
+
+The handler emits structured session and error events without logging UUIDs,
+destination addresses, or DNS payloads. After deployment, inspect real-time
+logs in Cloudflare's Workers & Pages dashboard or with Wrangler. External alert
+routing has not been configured.
 
 ## Deployment status
 
