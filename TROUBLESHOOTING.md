@@ -5,6 +5,7 @@
 | `/ws` returns 503 | `ACCESS_UUID` is missing or not a UUID | Check the Production secret binding and redeploy. |
 | WebSocket closes with policy error | Client UUID does not match the Pages secret | Compare the client profile to the secret without printing either value. |
 | TCP connection fails before data | DNS resolution, destination policy, or outbound socket restriction | Check Pages runtime logs; test a public non-Cloudflare destination. |
+| TCP to a normal website on 80 or 443 closes with 1011 | Cloudflare Pages does not provide a raw TCP socket for HTTP(S) traffic on those ports | Configure an explicitly trusted HTTP CONNECT proxy on a reachable port, or use a VPS data plane. `fetch` cannot replace a transparent TLS stream. |
 | A Cloudflare-hosted website closes | Cloudflare blocks outbound sockets to its IP ranges | Use only an explicitly configured trusted HTTP CONNECT proxy or choose a non-Pages egress architecture. |
 | DNS lookup times out | DoH endpoint or DNS query problem | Check Pages runtime logs and test a valid DNS query in the client. |
 | Non-DNS UDP application has no connectivity | Expected limitation | Pages V2 drops UDP other than port 53. |

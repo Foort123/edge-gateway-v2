@@ -41,5 +41,7 @@ Use these values in a VLESS client:
 
 DNS requests carried as VLESS UDP to destination port 53 are sent through
 Cloudflare DoH. Other UDP destinations are dropped without ending the WebSocket
-session. Some Cloudflare-hosted TCP destinations may fail due to platform
-egress restrictions.
+session. Production testing shows direct TCP sockets to ordinary HTTP/HTTPS
+services on ports 80 and 443 are rejected by the Pages runtime. A trusted
+HTTP CONNECT proxy must be configured as `OUTBOUND_PROXY_IP` on a reachable TCP
+port for ordinary web traffic, or the data plane must run outside Pages.

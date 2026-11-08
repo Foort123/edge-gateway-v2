@@ -1,25 +1,36 @@
 # Deployment
 
-## Create the independent Pages project
+## Current Pages project
 
-1. In Cloudflare Pages, create a project named `edge-gateway-v2` and connect
-   the GitHub repository `Foort123/edge-gateway-v2`.
-2. Select `main` as the production branch.
-3. Leave the build command empty and set the build output directory to
-   `public`. There is no build step.
-4. Add `ACCESS_UUID` as a **secret text** variable in Production. Generate a
-   fresh UUID v4 and keep it out of Git.
-5. Save the settings and deploy the latest `main` commit.
+`edge-gateway-v2` is a Cloudflare Pages **Direct Upload** project at
+[`edge-gateway-v2-5r0.pages.dev`](https://edge-gateway-v2-5r0.pages.dev). It was
+created separately after Git integration rejected the repository because it is
+already attached to a Pages project in another Cloudflare account (API error
+`8000093`). Cloudflare documents that Direct Upload projects cannot later be
+switched to Git integration. Pushes to GitHub do not deploy this Pages project.
 
-The Pages route configuration is in `public/_routes.json`; only `/`, `/ws`, and
-`/ws/*` invoke Pages Functions. Other assets are served statically.
+The production build command is empty, the output directory is `public`, and
+`ACCESS_UUID` is stored as a Production secret. The project has no external
+`OUTBOUND_PROXY_IP` configured.
 
-## Updates
+## Deploy updates
 
-Push reviewed changes to `main`; Cloudflare Pages builds the production branch
-when automatic deployments are enabled. Check the Pages deployment status
-before using the endpoint. A static page response only proves the asset deploy,
-not that VLESS traffic is working.
+From the repository root, with Wrangler authenticated, run:
+
+```powershell
+npm exec --yes --package wrangler@4.158.0 -- wrangler pages deploy public --project-name=edge-gateway-v2 --branch=main
+```
+
+The `functions/` directory must remain at the repository root so Wrangler
+bundles the Pages Function. Use a narrowly scoped Wrangler login and encrypted
+OS keyring storage:
+
+```powershell
+npm exec --yes --package wrangler@4.158.0 -- wrangler login --scopes pages:write account:read --use-keyring
+```
+
+After deployment, verify the deployment in Pages and use `wrangler logout` when
+finished. A static page response alone does not prove tunnel connectivity.
 
 ## Local development
 
@@ -38,14 +49,22 @@ rollback.
 
 ## Current deployment status
 
-On 2026-11-08, Cloudflare rejected creating `edge-gateway-v2` with the Git
-integration because `Foort123/edge-gateway-v2` is already attached to a Pages
-project in a different Cloudflare account (API error `8000093`). The connected
-Cloudflare session exposes only the current account, where no V2 Pages project
-exists. No V2 project or production secret was created by that failed request.
+Production deployment `2fadb939-761e-4e9a-9606-d8ed553fbe8d` succeeded on
+2026-11-08 from commit `f7041f292b09c0e2fa3399416b06f3e0d0ce8991`; Cloudflare
+reports `uses_functions: true`.
 
-To keep native Git integration, detach this repository from the other
-Cloudflare account first, then retry project creation. A Direct Upload project
-is a separate setup choice; Cloudflare's [C3 setup guide](https://developers.cloudflare.com/pages/get-started/c3/)
-states that a Direct Upload deployment cannot later be connected to a Git
-repository. Do not create that project unless that tradeoff is intended.
+Production checks:
+
+- `GET /` and ordinary `GET /ws`: HTTP 200.
+- Valid VLESS authentication and UDP DNS over DoH: passed; the test query
+  returned two A records and kept the WebSocket open.
+- VLESS TCP to `example.com:443`: failed. Cloudflare's runtime log reports that
+  the target is an HTTP-based service and recommends `fetch` instead. `fetch`
+  cannot provide the transparent TLS stream required by VLESS.
+- Browser traffic, throughput, long sessions, and reconnect recovery: not
+  verified. The deployment is not a functional web-browsing VPN.
+
+This is a Pages-only architecture limit, not a missing deploy setting. To route
+web traffic, configure a separately managed, trusted HTTP CONNECT proxy on a
+reachable TCP port or move the data plane to the previously selected
+VPS-first WireGuard + Xray architecture. Do not use a public relay by default.

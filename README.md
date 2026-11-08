@@ -1,37 +1,39 @@
 # Edge Gateway V2
 
-An independent Cloudflare Pages VLESS-over-WebSocket gateway. The Pages
-Function forwards TCP streams with `cloudflare:sockets`; UDP requests to port 53
-are sent through Cloudflare DNS-over-HTTPS. Other UDP packets are dropped while
-the WebSocket remains open.
+An independent Cloudflare Pages VLESS-over-WebSocket prototype. It authenticates
+VLESS sessions and sends DNS requests over DoH. Cloudflare Pages can open some
+outbound TCP sockets, but its runtime rejects direct socket connections to
+HTTP/HTTPS services on ports 80 and 443. A production probe to `example.com:443`
+closed with the runtime error “consider using fetch instead”; `fetch` cannot
+provide the transparent TLS byte stream a VLESS tunnel needs. As deployed, this
+is not a working web-browsing VPN or a solution for blocked websites.
 
-This is an application-level proxy, not a full-device IP VPN. It does not carry
-arbitrary UDP, ICMP, or other layer-3 traffic. Cloudflare also blocks outbound
-TCP sockets to Cloudflare IP ranges, so some Cloudflare-hosted destinations
-cannot be reached directly. A configured HTTP CONNECT proxy can be used as an
-explicit, separately trusted egress dependency.
+DNS-over-HTTPS was verified through the deployed WebSocket. Other UDP packets
+are dropped; arbitrary UDP, ICMP, and layer-3 traffic are unavailable. Normal
+web traffic requires a separately trusted HTTP CONNECT egress service on a
+reachable port, or a different architecture such as a VPS running WireGuard and
+Xray. Some Cloudflare-hosted destinations may also be unreachable directly.
 
 ## Current status
 
-- Implemented: VLESS TCP, DNS UDP over DoH, safe drop for other UDP, public
-  destination checks, bounded WebSocket input, TCP half-close, optional
-  operator-configured HTTP CONNECT.
-- Unit tested: protocol parsing, authentication, DNS framing and validation,
-  TCP direct/fallback paths, session behavior, and Pages request handling.
-- Deployment and real-client end-to-end status: see [DEPLOYMENT.md](DEPLOYMENT.md)
-  and [TESTING.md](TESTING.md). Do not infer successful tunneling from the
-  static landing page.
+- Implemented: VLESS authentication, DNS UDP over DoH, safe drop for other UDP,
+  public destination checks, bounded WebSocket input, TCP half-close, and
+  optional operator-configured HTTP CONNECT.
+- Unit tested: 23 Node tests pass. Wrangler compiled the Pages Function.
+- Production verified: landing page returns 200; authenticated VLESS DNS returns
+  valid DNS answers. Direct VLESS TCP to HTTPS port 443 is rejected by the Pages
+  runtime. See [DEPLOYMENT.md](DEPLOYMENT.md) and [TESTING.md](TESTING.md).
 
 ## Quick start
 
 1. Install Node.js 20 or newer.
 2. Run `npm test`.
-3. Create a Cloudflare Pages project connected to this repository. Leave the
-   build command blank and set the output directory to `public`.
-4. Add `ACCESS_UUID` as a secret environment variable for production. Generate
-   a UUID locally with `node -e "console.log(crypto.randomUUID())"`; do not
-   commit it.
-5. Use `wss://<project>.pages.dev/ws` in a VLESS WebSocket client with TLS.
+3. The current Pages project is a Direct Upload project, not Git-integrated.
+   See [DEPLOYMENT.md](DEPLOYMENT.md) for the Wrangler deployment command.
+4. `ACCESS_UUID` is a production secret. Never commit or log it.
+5. A VLESS profile can verify authentication and DNS-over-HTTPS, but the current
+   Pages-only egress cannot tunnel ordinary HTTP/HTTPS destinations on ports 80
+   and 443.
 
 See [INSTALLATION.md](INSTALLATION.md), [CONFIGURATION.md](CONFIGURATION.md),
 and [DEPLOYMENT.md](DEPLOYMENT.md) for complete instructions.

@@ -21,20 +21,32 @@ behavior, half-close, static requests, and WebSocket setup validation.
 - A Pages deployment is not an end-to-end result until an actual VLESS client
   authenticates and fetches data through the tunnel.
 
-## Production smoke test
+## Production verification (2026-11-08)
 
-After Pages reports a successful production deployment:
+Deployment `2fadb939-761e-4e9a-9606-d8ed553fbe8d` on
+`edge-gateway-v2-5r0.pages.dev` was checked:
 
-1. Open `https://<project>.pages.dev/` and confirm the static page loads.
-2. In a VLESS client, use TLS on port 443, WebSocket path `/ws`, and the
-   `ACCESS_UUID` secret.
-3. Confirm a public TCP HTTPS destination loads through the client.
-4. Confirm DNS queries resolve through the VLESS DNS path.
-5. Confirm a non-DNS UDP app does not receive service; the WebSocket should
-   remain available for TCP traffic.
-6. Try a Cloudflare-hosted site and record the result separately; Pages egress
-   can block its destination IP range.
-7. Reconnect after an interrupted WebSocket and record reconnect time.
+- `GET /`: HTTP 200, title `Edge Gateway V2`.
+- Ordinary `GET /ws`: HTTP 200.
+- Valid VLESS UUID over WebSocket: accepted.
+- VLESS UDP DNS query for `example.com A`: valid DoH response with two A records;
+  the WebSocket stayed open.
+- VLESS TCP to `example.com:443`: failed with WebSocket close 1011. The Pages
+  runtime log states that direct sockets cannot connect to this HTTP-based
+  service and recommends `fetch`.
+- Actual website loading through the tunnel: failed/unavailable on the
+  Pages-only deployment.
+- Invalid production UUID, arbitrary UDP, custom-port TCP, throughput, long
+  duration, and reconnect recovery: not tested in production.
+
+The Cloudflare TCP Sockets documentation directs HTTP requests on ports 80 and
+443 to `fetch`. That API does not expose the raw TLS stream expected by a
+transparent VLESS TCP tunnel. Pages-only therefore cannot meet the browser
+traffic goal. A configured trusted HTTP CONNECT egress service on a reachable
+port or a VPS data plane is required.
+
+The Node `node:test` suite has 23 passing tests, but uses fake sockets and does
+not override this production runtime limitation.
 
 Record the date, client version, client network, Pages deployment ID, hostname,
 and observed result. Never include the UUID in logs or screenshots.

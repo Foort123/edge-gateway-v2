@@ -1,17 +1,20 @@
 # VPN V2 architecture
 
-Status: accepted by the user. The deployment target is Cloudflare Pages. This
-choice constrains the product to an application-level TCP proxy; it cannot
-provide a general-purpose IP VPN.
+Status: implemented and deployed as an experiment. Production verification
+found a platform limit that prevents Pages-only VLESS from reaching ordinary
+HTTP/HTTPS services on ports 80 and 443. The current deployment therefore does
+not meet the blocked-site access goal and must not be presented as a usable web
+VPN.
 
 ## Decision summary
 
 VPN V2 is an independent Pages project with a Pages Function at `/ws`, a
 minimal static page, and a secret `ACCESS_UUID`. The function authenticates
-VLESS over WebSocket, streams VLESS TCP through `cloudflare:sockets`, resolves
-hostnames through DoH before direct socket use, and forwards VLESS UDP requests
-to port 53 through DoH. Other UDP destinations are dropped without ending the
-WebSocket session.
+VLESS over WebSocket, resolves hostnames through DoH, supports DNS UDP port 53
+over DoH, drops other UDP, and attempts direct TCP through `cloudflare:sockets`.
+Production testing confirms the runtime rejects HTTP/HTTPS socket destinations
+on ports 80 and 443. An explicitly configured HTTP CONNECT proxy can provide
+that egress, but it is a separate trusted service.
 
 This is the most complete data plane that fits a Pages-only requirement. It is
 not a full-device tunnel: arbitrary UDP, ICMP, and other layer-3 traffic are not
@@ -23,7 +26,7 @@ available through the Pages runtime API.
 flowchart LR
     C[Client: VLESS over WSS] -->|GET /ws + UUID| P[Cloudflare Pages Function]
     P --> A{Authenticate and parse command}
-    A -->|TCP 0x01| T[cloudflare:sockets TCP stream]
+    A -->|TCP 0x01, supported destinations| T[cloudflare:sockets TCP stream]
     T --> I[Public Internet]
     P -->|Resolve hostname and reject private answers| D
     A -->|UDP 0x02, port 53| D[DoH POST via fetch]
@@ -58,6 +61,12 @@ Other material limits:
   deployment therefore cannot guarantee access to sites whose destination
   resolves into those ranges. A trusted external egress proxy can route around
   that limitation, but it is a separate service and makes the design hybrid.
+- Cloudflare's TCP Sockets documentation says to use `fetch` for HTTP requests
+  to ports 80 or 443. A transparent VLESS TCP stream cannot be replaced by
+  `fetch`, because TLS records must pass through unchanged. Production testing
+  to `example.com:443` produced the documented “consider using fetch instead”
+  error and closed the WebSocket with 1011. A Pages-only deployment therefore
+  cannot provide ordinary web browsing. [TCP sockets](https://developers.cloudflare.com/workers/runtime-apis/tcp-sockets/).
 - Workers limits include 128 MB memory and six simultaneous connections in the
   initial connection/response-header phase. This design opens one TCP socket
   per VLESS TCP session and uses DoH `fetch` for DNS. [Workers limits](https://developers.cloudflare.com/workers/platform/limits/)
@@ -76,7 +85,7 @@ See [Workers limits](https://developers.cloudflare.com/workers/platform/limits/)
 
 | Architecture | Strengths | Limitations | Fit |
 | --- | --- | --- | --- |
-| Cloudflare Pages only | No server to maintain; globally reachable HTTPS/WebSocket ingress; direct TCP stream API | No raw UDP; Cloudflare IP ranges blocked for outbound sockets; runtime updates can interrupt sessions | Fits the stated hosting constraint only if TCP proxy semantics are accepted |
+| Cloudflare Pages only | No server to maintain; globally reachable HTTPS/WebSocket ingress; DNS over DoH | No raw UDP; direct HTTP/HTTPS TCP ports 80/443 are rejected; Cloudflare IP ranges blocked; not a web-browsing VPN | Fails the blocked-site browsing goal |
 | VPS with WireGuard and Xray | Native layer-3 WireGuard carries TCP and UDP; Xray VLESS/TLS can provide a TCP fallback; direct egress avoids the Pages TCP restriction | Requires VPS operations, updates, firewall and monitoring | Best fit for a full VPN, but conflicts with Pages-only hosting |
 | Pages ingress plus VPS egress | Can keep the Pages WebSocket endpoint and route blocked destinations through a controlled egress host | Adds a network hop and a second failure domain; still cannot carry arbitrary UDP at Pages ingress; no longer Pages-only | Viable only if controlled egress is allowed as a separate component |
 
@@ -123,15 +132,21 @@ than a full IP VPN.
 
 ## Verification status
 
-The Node unit suite covers VLESS parsing and authentication, DNS framing and
-validation, direct TCP and explicit CONNECT selection, session handling,
-half-close, and Pages request routing. Those tests use fakes; they do not prove
-Cloudflare runtime compatibility or live connectivity. Performance and
-real-client end-to-end results remain untested until a deployment is available.
-See [TESTING.md](TESTING.md) and [BENCHMARKS.md](BENCHMARKS.md).
+The 23-test Node suite covers VLESS parsing and authentication, DNS framing and
+resolution filtering, direct TCP and explicit CONNECT selection, session
+handling, half-close, and Pages request routing. Wrangler compiled the Pages
+Function. Production GETs to `/` and `/ws` returned 200, and an authenticated
+VLESS DNS request returned two A records. A VLESS TCP request to
+`example.com:443` failed with Cloudflare's HTTP-based-socket restriction.
+Throughput, long-duration stability, reconnect recovery, non-HTTP custom TCP,
+and actual browser traffic remain unverified. See [TESTING.md](TESTING.md) and
+[BENCHMARKS.md](BENCHMARKS.md).
 
 ## Accepted scope
 
-The user accepted the Pages-only scope: VLESS TCP plus DNS-over-HTTPS, with no
-guarantee for arbitrary UDP/ICMP or some Cloudflare-hosted destinations. V2 is
-being implemented and tested against that scope.
+The user selected Cloudflare Pages and accepted no guarantee for arbitrary
+UDP/ICMP or some Cloudflare-hosted destinations. The additional port 80/443
+restriction was discovered only in the production runtime test. Pages-only is
+not sufficient for the requested blocked-site browsing. A full VPN requires a
+VPS-first WireGuard + Xray architecture (previously selected by the user) or a
+Pages gateway plus a separately managed trusted HTTP CONNECT egress service.
