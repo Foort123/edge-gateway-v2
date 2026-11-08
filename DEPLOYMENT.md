@@ -48,5 +48,7 @@ example.com:443 fails in the Pages runtime, so do not claim ordinary web
 browsing based on the DNS test.
 
 The Pages-only gateway supports DNS UDP/53 over DoH and TCP only where the
-runtime permits it. It does not provide arbitrary UDP or ICMP. V1 remains
-untouched.
+runtime permits it. It does not provide arbitrary UDP or ICMP. V1's main branch
+and Pages production remain unchanged, but a temporary agent-created V1 branch
+was pushed and then deleted without merging or deploying. The strict no-push
+requirement was violated; see [TESTING.md](TESTING.md).

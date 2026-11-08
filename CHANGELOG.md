@@ -4,8 +4,9 @@
 
 - Race TCP connects to up to four validated public DNS answers, keep the first
   successful socket, and close the remaining sockets.
-- Drain queued WebSocket input and close the outbound TCP socket on client close,
-  with a bounded timeout to avoid leaving remote connections open.
+- Drain TCP frames already queued before WebSocket close, then close the outbound
+  socket with a bounded timeout. Add a regression test for queued-frame draining.
+- Ignore Wrangler's generated `_worker.bundle` build artifact.
 - Add official-platform research and an explicit acceptance-status table.
 
 ## Pages-only scope (2026-11-08)

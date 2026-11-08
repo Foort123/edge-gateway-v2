@@ -52,7 +52,10 @@ Sources: [Cloudflare TCP sockets](https://developers.cloudflare.com/workers/runt
 - A newer deployment was rejected by Cloudflare with 8000119 (“Your Pages
   project has been blocked”) and is not live. The account owner has not
   appealed this block.
-- V1 repo and Pages project remain separate and were not changed.
+- V1 remains a separate project; its main branch and Pages production were not
+  changed. A temporary agent-created branch was pushed to the V1 repository and
+  later deleted without merging or deploying. The strict no-push isolation
+  criterion was therefore violated; see [TESTING.md](TESTING.md).
 
 The repository no longer includes the previously explored VPS deployment
 path; the current implementation follows the user's Pages-only selection.

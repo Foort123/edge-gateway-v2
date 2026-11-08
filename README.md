@@ -52,4 +52,8 @@ with:
 The Pages project uses an empty build command, output directory public, and
 the production secret ACCESS_UUID. Log out of Wrangler when finished.
 
-V1 (Foort123/edge-tcp-gateway) is separate and was not changed.
+V1 (Foort123/edge-tcp-gateway) remains on a separate production project. Its
+main branch and Pages deployment were not changed. A temporary agent-created
+integration branch was pushed to the V1 repository and then deleted; it was
+never merged or deployed. Because the original constraint prohibited any V1
+push, strict V1-isolation acceptance is not claimed (see [TESTING.md](TESTING.md)).

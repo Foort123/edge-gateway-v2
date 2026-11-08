@@ -21,5 +21,7 @@
 - The Pages project is currently blocked from new deployments with Cloudflare
   error 8000119. Do not create a duplicate project to bypass the block.
 
-V1 (Foort123/edge-tcp-gateway) is a separate production project and remains
-untouched.
+V1 (Foort123/edge-tcp-gateway) remains a separate production project. Its
+main branch and deployment were not changed, but a temporary agent-created
+branch was pushed to the V1 repository and deleted without a merge or deploy.
+The strict no-push requirement was violated; see [TESTING.md](TESTING.md).
