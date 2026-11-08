@@ -17,6 +17,19 @@ The Pages project is kept as a diagnostic and DNS prototype. It does not
 provide a working browser-traffic tunnel on ports 80/443. See
 [Cloudflare TCP sockets](https://developers.cloudflare.com/workers/runtime-apis/tcp-sockets/).
 
+## Latest deployment attempt
+
+Commit `0fbb21b9c52882882f39dd7c86095b39ee6e2ea3` is pushed to GitHub. Wrangler
+4.158.0 compiled the Pages Function and uploaded the changed static asset, but
+Cloudflare rejected the production deployment with error `8000119`:
+“Your Pages project has been blocked.” The latest successful deployment remains
+`2fadb939-761e-4e9a-9606-d8ed553fbe8d` from commit
+`f7041f292b09c0e2fa3399416b06f3e0d0ce8991`; the new Function and diagnostic
+page are not live. The current Pages URL still returns HTTP 200 from that older
+deployment. Cloudflare's response directs the account owner to
+`abusereply@cloudflare.com`. No duplicate project was created to work around
+the block.
+
 ## VPS requirements
 
 Provision a separate, dedicated Ubuntu Server 24.04 amd64 VPS. The project does
@@ -91,7 +104,8 @@ before deployment; do not reuse or modify V1.
 
 ## Local Pages deployment
 
-For the existing Direct Upload project, with Wrangler authenticated:
+For the existing Direct Upload project, after Cloudflare has cleared any
+project block and Wrangler is authenticated:
 
     npm exec --yes --package wrangler@4.158.0 -- wrangler pages deploy public --project-name=edge-gateway-v2 --branch=main
 

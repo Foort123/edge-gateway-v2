@@ -127,10 +127,12 @@ benefit has been measured. [Workers WebSockets](https://developers.cloudflare.co
 
 ## Verification status
 
-- Pages production: the static page returns 200; authenticated VLESS DNS over
-  DoH returned two records; direct VLESS TCP to HTTPS port 443 failed in the
-  Cloudflare runtime.
-- Local: all 25 Node tests pass. The generated Xray config passes Xray
+- Pages production: the static page from the previous deployment returns 200;
+  authenticated VLESS DNS over DoH returned two records; direct VLESS TCP to
+  HTTPS port 443 failed in the Cloudflare runtime. The 2026-11-08 deployment of
+  commit `0fbb21b9c52882882f39dd7c86095b39ee6e2ea3` was rejected with API error
+  `8000119` (“Your Pages project has been blocked”), so that commit is not live.
+- Local: all 27 Node tests pass. The generated Xray config passes Xray
   26.10.31's run -test. All four VPS Bash scripts pass bash -n.
 - Not tested: wg-quick on Linux, VPS deployment, actual WireGuard handshake,
   actual Hiddify/Xray connection, IPv6 egress, failure recovery, throughput,

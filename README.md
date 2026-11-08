@@ -19,12 +19,14 @@ Cloudflare hop. Details and tradeoffs are in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Current status
 
-- Pages: deployed independently; DNS over DoH was production-tested. Ordinary
-  VLESS TCP to example.com:443 failed in the Pages runtime.
+- Pages: the existing Direct Upload project still serves its previous
+  deployment; Cloudflare rejected the new deployment with error `8000119`
+  (“Your Pages project has been blocked”). DNS over DoH was production-tested;
+  ordinary VLESS TCP to example.com:443 failed in the Pages runtime.
 - VPS artifacts: pinned Xray installer, WireGuard/NAT setup, Xray config
   renderer, DoT DNS resolver, health check, and rollback-aware Xray updater are
   in ops/vps.
-- Tests: 25 Node tests pass. Xray 26.10.31 accepted the generated server config.
+- Tests: 27 Node tests pass. Xray 26.10.31 accepted the generated server config.
   Bash syntax checks pass.
 - VPS runtime and client connectivity: not deployed or tested. A fresh VPS and
   its public endpoint are required before end-to-end verification.
