@@ -31,9 +31,25 @@ publication with error 8000119 (“Your Pages project has been blocked”). The
 new source and diagnostic page are not live. The account owner has not appealed
 the block.
 
-The DNS test and HTTP 200 response do not prove this is a usable general VPN.
-Ordinary HTTPS traffic is not currently supported by the observed Pages
-runtime behavior.
+The DNS result and one local HTTP 200 response do not prove this is a usable
+general VPN. Production HTTPS remains unverified: the production
+`example.com:443` test failed, and the local Wikimedia result does not establish
+connectivity to Cloudflare-hosted destinations.
+
+## Local Wrangler verification
+
+With Wrangler 4.158.0, Node.js 22, and a temporary test UUID, the local Pages
+Function returned HTTP 200 for `/` and `/ws`, and upgraded VLESS WebSockets with
+HTTP 101. Through the VLESS TCP path, an SSH greeting was received from
+`ssh.github.com:443`, and a TLS request to the resolved public address for
+`www.wikipedia.org` returned `HTTP/1.1 200 OK` (`text/html`, 14,960 response
+bytes). This confirms local TCP/TLS/HTTP forwarding to those tested endpoints;
+it does not confirm the same result in the deployed production runtime.
+
+A local VLESS UDP DNS query upgraded successfully, but Wrangler's local
+`workerd` timed out while fetching Cloudflare DoH. Unit DoH tests pass, and the
+earlier production DNS query returned A records. This local network timeout is
+not evidence that the deployed DoH path failed.
 
 ## Acceptance status
 
@@ -42,13 +58,13 @@ runtime behavior.
 | V1 isolation | PASS | V2 uses a separate repository and Pages project; this work touched only `edge-gateway-v2` |
 | V2 architecture documented | PASS | [ARCHITECTURE.md](ARCHITECTURE.md) and [RESEARCH.md](RESEARCH.md) |
 | Authentication | PARTIAL | UUID validation and rejection have unit tests; production is still running an older build |
-| TCP connectivity | PARTIAL | Stream and socket half-open configuration tests pass; production `example.com:443` failed, and no other live destination was verified |
+| TCP connectivity | PARTIAL | Unit tests pass; local VLESS TLS/HTTP to Wikimedia returned 200 and GitHub SSH returned a banner; production `example.com:443` failed |
 | UDP connectivity | PARTIAL | DNS UDP/53 over DoH is implemented and was production-verified; other UDP is dropped |
 | DNS | PASS | DoH tests pass; the production VLESS DNS query returned A records |
 | Reliability and recovery | PARTIAL | Socket cleanup, backpressure, and close behavior have unit coverage; long sessions and reconnect recovery were not tested |
 | Security | PARTIAL | UUID authentication, reserved-address filtering, and secret handling have test/review coverage; no external security audit was performed |
 | Performance | NOT TESTED | No valid production web-TCP path; no latency, throughput, loss, or endurance measurements |
-| Deployment | PARTIAL | Initial independent Pages deployment succeeded; the latest source deployment was rejected with 8000119 |
+| Deployment | PARTIAL | Initial independent Pages deployment succeeded; the latest source deployment was rejected with 8000119, and current production still runs the earlier commit |
 | Documentation | PARTIAL | Setup and limits are documented, but general-VPN behavior and client end-to-end use remain unverified |
 
 This table separates implementation and unit coverage from production evidence.
