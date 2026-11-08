@@ -39,12 +39,14 @@ connectivity to Cloudflare-hosted destinations.
 
 ## Local Wrangler verification
 
-On V2 commit `a9b9a728523ef6aada3cbdbf81159dff0d4f87c9`, Wrangler 4.158.0
-served the Pages Function locally with a test-only UUID. The `/ws` request
-upgraded with HTTP 101; a Node WebSocket-to-TLS client sent a VLESS TCP request
-to the locally resolved public IPv4 address for `www.wikipedia.org:443`,
-completed the TLS handshake, and received `HTTP/1.1 200 OK`. This is local
-end-to-end evidence for the tested destination only, not production proof.
+Against the Pages Function at V2 commit
+`cda30afb00b8d8bab78afe35647e8e99b71eedab`, Wrangler 4.158.0 served it locally
+with a test-only UUID. The `/ws` request
+upgraded with HTTP 101; the reusable Node WebSocket-to-TLS smoke test sent a
+VLESS TCP request to the locally resolved public IPv4 address for
+`www.wikipedia.org:443`, completed TLS, and received `HTTP/1.1 200 OK`. This
+test is repeatable with `npm run test:e2e:local`; it covers only that local
+destination path, not production egress or the gateway's DNS lookup.
 
 With Wrangler 4.158.0, Node.js 22, and a temporary test UUID, the local Pages
 Function returned HTTP 200 for `/` and `/ws`, and upgraded VLESS WebSockets with

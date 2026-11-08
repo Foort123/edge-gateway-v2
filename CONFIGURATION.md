@@ -14,6 +14,20 @@ The VLESS client connects to the Pages hostname over TLS and WebSocket path
 /ws. A successful DNS query does not imply that ordinary sites can be
 reached through the tunnel.
 
+## Hiddify / Xray client profile
+
+After Cloudflare clears the project block and the V2 production `ACCESS_UUID`
+is known, replace `YOUR-ACCESS-UUID` below with that exact secret and import
+the link into Hiddify or an Xray-compatible client:
+
+```text
+vless://YOUR-ACCESS-UUID@edge-gateway-v2-5r0.pages.dev:443?encryption=none&security=tls&sni=edge-gateway-v2-5r0.pages.dev&type=ws&host=edge-gateway-v2-5r0.pages.dev&path=%2Fws#Edge-Gateway-V2
+```
+
+This is a profile template, not a claim that the blocked project is currently
+usable. Even after deployment is cleared, it is only a VLESS TCP/DNS gateway;
+ordinary web browsing and access to blocked sites are not guaranteed by Pages.
+
 ## Outbound proxy configuration
 
 The Pages-only deployment does not use an external HTTP CONNECT proxy or a

@@ -26,6 +26,14 @@ sample ACCESS_UUID with a private UUID v4, then run:
 
 .dev.vars is ignored by Git. Never commit production credentials.
 
+For a repeatable TCP end-to-end smoke test, start the local Pages server with
+a throwaway UUID binding, then run `npm run test:e2e:local` in a second
+terminal with the same `ACCESS_UUID`. This test uses a locally resolved IPv4
+address for `www.wikipedia.org`, establishes TLS inside VLESS-over-WebSocket,
+and expects HTTP 200. It requires Node.js 22.4+ (or Node.js 20.10+ with
+`--experimental-websocket`) and does not verify production egress or the
+gateway's DoH hostname lookup.
+
 ## Production
 
 The Pages project is Direct Upload. See DEPLOYMENT.md for its build settings
