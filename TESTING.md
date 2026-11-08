@@ -24,6 +24,8 @@ edge-gateway-v2-5r0.pages.dev.
 Observed on 2026-11-08:
 
 - / and a normal GET to /ws returned HTTP 200.
+- GET /health returned HTTP 200 with the deployed static index.html body. The
+  JSON health endpoint in the current source is not present in production.
 - A VLESS UDP DNS query for example.com returned two A records through DoH.
 - A VLESS TCP connection to example.com:443 failed with WebSocket close 1011.
   The runtime stated that an HTTP-based socket target should use fetch.
@@ -55,18 +57,17 @@ The same local harness downloaded `/files/10Mb.dat` from `proof.ovh.net` in
 three runs; see [BENCHMARKS.md](BENCHMARKS.md) for timings and the test
 environment. These measurements are not production performance evidence.
 
-On 2026-11-08, the updated local Pages source returned `GET /health` with
-`200 OK` and no UUID in the response. The reusable TCP smoke test against
-`www.wikipedia.org:443` returned `HTTP/1.1 200 OK` (16.3 ms WebSocket open,
-216.1 ms TLS ready, 178.7 ms TTFB). It transferred a 122,421-byte response in
-200.1 ms; this small response is not a throughput benchmark.
-
-The added `npm run test:e2e:dns` check sent a local VLESS UDP/53 request for
-`example.com` through the Pages Function and received a 61-byte DNS response
-with two answer records. This verifies the current local DoH route; the script
-does not identify which resolver answered. Unit tests separately verify the
-Cloudflare-first order and Google's failover behavior. Structured session logs
-were visible in the local Wrangler output and contained mode and close code only.
+On 2026-11-08, commit `142abb8926727fccc60c8928a3cb5c154dfb9762` was rerun
+locally with Wrangler 4.158.0 and compatibility date `2026-11-08`. `npm test`
+passed 30/30 tests. Local `GET /health` returned JSON status `ok` with all four
+readiness checks true and no UUID in the response; a normal `GET /ws` returned
+HTTP 200. The VLESS TCP smoke test against `www.wikipedia.org:443` returned
+`HTTP/1.1 200 OK` (25.3 ms WebSocket open, 221.3 ms TLS ready, 180.2 ms TTFB).
+It transferred a 122,421-byte response in 198.7 ms (4.93 Mbit/s); that small
+response is not a throughput benchmark. `npm run test:e2e:dns` received a
+61-byte DNS response with two answers for `example.com`; the script does not
+identify which resolver answered. These checks cover the current local source,
+not the older deployed production code.
 
 To repeat both local checks, start `wrangler pages dev` as above, set the same
 throwaway UUID in a second PowerShell terminal, then run:
