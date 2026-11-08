@@ -1,0 +1,8 @@
+{
+  "name": "edge-gateway-v2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}

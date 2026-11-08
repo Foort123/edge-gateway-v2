@@ -1,28 +1,27 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#0b1220">
+    <meta name="theme-color" content="#101827">
     <title>Edge Gateway V2</title>
     <style>
-      :root { color-scheme: dark; font-family: system-ui, sans-serif; }
-      body { min-height: 100vh; margin: 0; display: grid; place-items: center; background: #0b1220; color: #e5edf8; }
-      main { width: min(38rem, calc(100% - 3rem)); padding: 2rem; border: 1px solid #25344d; border-radius: 1rem; background: #111c2e; box-shadow: 0 1.5rem 4rem #0005; }
-      .status { display: inline-flex; align-items: center; gap: .55rem; padding: .4rem .7rem; border-radius: 99px; background: #163a32; color: #9ce5c8; font-size: .85rem; }
-      .dot { width: .5rem; height: .5rem; border-radius: 50%; background: currentColor; }
-      h1 { margin: 1.2rem 0 .5rem; font-size: clamp(1.8rem, 5vw, 2.5rem); }
-      p { color: #afbdd1; line-height: 1.65; }
-      code { color: #c4d7ff; }
-      footer { margin-top: 1.7rem; color: #8192aa; font-size: .85rem; }
+      :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #101827; color: #edf2fa; }
+      body { min-height: 100vh; margin: 0; display: grid; place-items: center; }
+      main { width: min(40rem, calc(100% - 3rem)); box-sizing: border-box; padding: 2rem; border: 1px solid #2a3b53; border-radius: 1rem; background: #172338; }
+      .label { color: #9eb7df; font-size: .8rem; letter-spacing: .12em; text-transform: uppercase; }
+      h1 { margin: .8rem 0; font-size: clamp(2rem, 6vw, 3rem); }
+      p { color: #c2cedf; line-height: 1.65; }
+      code { color: #c7dcff; }
+      footer { margin-top: 2rem; color: #8da0bb; font-size: .9rem; }
     </style>
   </head>
   <body>
     <main>
-      <span class="status"><span class="dot"></span>Gateway online</span>
+      <div class="label">Cloudflare Pages Function</div>
       <h1>Edge Gateway V2</h1>
-      <p>Минимальная страница проекта Cloudflare Pages. WebSocket endpoint шлюза доступен по пути <code>/ws</code>.</p>
-      <footer>Cloudflare Pages Functions · VLESS over WebSocket</footer>
+      <p>VLESS over WebSocket is available at <code>/ws</code>. The gateway supports TCP and DNS over HTTPS. Other UDP traffic and ICMP are not supported.</p>
+      <footer>This page confirms that the static site is deployed; it does not test the tunnel.</footer>
     </main>
   </body>
 </html>

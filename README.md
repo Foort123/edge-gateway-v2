@@ -1,32 +1,51 @@
 # Edge Gateway V2
 
-Cloudflare Pages Function for VLESS over WebSocket with TCP forwarding.
+An independent Cloudflare Pages VLESS-over-WebSocket gateway. The Pages
+Function forwards TCP streams with `cloudflare:sockets`; UDP requests to port 53
+are sent through Cloudflare DNS-over-HTTPS. Other UDP packets are dropped while
+the WebSocket remains open.
 
-## Pages settings
+This is an application-level proxy, not a full-device IP VPN. It does not carry
+arbitrary UDP, ICMP, or other layer-3 traffic. Cloudflare also blocks outbound
+TCP sockets to Cloudflare IP ranges, so some Cloudflare-hosted destinations
+cannot be reached directly. A configured HTTP CONNECT proxy can be used as an
+explicit, separately trusted egress dependency.
 
-- Build command: empty
-- Build output directory: public
-- Pages Function route: /ws
-- Production branch: main; pushes trigger a Pages build.
+## Current status
 
-Set ACCESS_UUID as a Pages environment variable (secret text recommended).
+- Implemented: VLESS TCP, DNS UDP over DoH, safe drop for other UDP, public
+  destination checks, bounded WebSocket input, TCP half-close, optional
+  operator-configured HTTP CONNECT.
+- Unit tested: protocol parsing, authentication, DNS framing and validation,
+  TCP direct/fallback paths, session behavior, and Pages request handling.
+- Deployment and real-client end-to-end status: see [DEPLOYMENT.md](DEPLOYMENT.md)
+  and [TESTING.md](TESTING.md). Do not infer successful tunneling from the
+  static landing page.
 
-## Outbound proxy routing
+## Quick start
 
-Cloudflare Workers blocks outbound TCP sockets to Cloudflare IP ranges. The function first attempts a direct TCP connection and falls back when it fails.
+1. Install Node.js 20 or newer.
+2. Run `npm test`.
+3. Create a Cloudflare Pages project connected to this repository. Leave the
+   build command blank and set the output directory to `public`.
+4. Add `ACCESS_UUID` as a secret environment variable for production. Generate
+   a UUID locally with `node -e "console.log(crypto.randomUUID())"`; do not
+   commit it.
+5. Use `wss://<project>.pages.dev/ws` in a VLESS WebSocket client with TLS.
 
-By default, the fallback pool uses raw TCP/SNI ProxyIP relays:
+See [INSTALLATION.md](INSTALLATION.md), [CONFIGURATION.md](CONFIGURATION.md),
+and [DEPLOYMENT.md](DEPLOYMENT.md) for complete instructions.
 
-- proxyip.fxxk.dedyn.io:443
-- proxyip.cmliussss.net:443
+## Project layout
 
-These endpoints do not use HTTP CONNECT. The gateway opens a plain TCP socket to each relay and forwards the client's TLS ClientHello unchanged so the relay can route by the destination SNI. This mode is for TLS destinations on port 443.
+- `functions/[[path]].js`: Cloudflare Pages entrypoint.
+- `functions/_lib/`: protocol, DNS, outbound TCP, and session modules.
+- `public/`: static landing page and Pages route configuration.
+- `test/`: Node.js built-in test suite; no third-party packages are required.
 
-Configure these Pages variables to override or change the behavior:
+## Architecture
 
-- OUTBOUND_PROXY_IP: comma-separated ordered endpoints. For raw ProxyIP mode, use host:port entries. For HTTP CONNECT mode, use http://host:port or https://host:port.
-- OUTBOUND_PROXY_PROTOCOL: proxyip (default) or http-connect.
-- OUTBOUND_PROXY_MODE: fallback (default, direct first) or always (route every destination through the configured proxy pool).
-- OUTBOUND_PROXY_USERNAME and OUTBOUND_PROXY_PASSWORD: optional credentials for HTTP CONNECT proxies.
-
-Public relay availability can change. The relay operator can observe the target SNI and connection metadata. Use only endpoints you trust. Only binary WebSocket frames and VLESS TCP requests are supported.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the accepted scope, packet flow,
+platform limits, and alternatives considered. Security assumptions are in
+[SECURITY.md](SECURITY.md). Known failures and diagnosis steps are in
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md).
