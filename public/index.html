@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#101827">
-    <title>Edge Gateway V2</title>
+    <title>Edge Gateway V2 — диагностика</title>
     <style>
       :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #101827; color: #edf2fa; }
       body { min-height: 100vh; margin: 0; display: grid; place-items: center; }
@@ -14,14 +14,23 @@
       p { color: #c2cedf; line-height: 1.65; }
       code { color: #c7dcff; }
       footer { margin-top: 2rem; color: #8da0bb; font-size: .9rem; }
+      .status { margin: 1.5rem 0; padding: 1rem; border-radius: .75rem; background: #101827; }
+      .status p { margin: .35rem 0; }
+      a { color: #9fc0ff; }
     </style>
   </head>
   <body>
     <main>
-      <div class="label">Cloudflare Pages Function</div>
-      <h1>Edge Gateway V2</h1>
-      <p>VLESS over WebSocket is available at <code>/ws</code>. The gateway supports TCP and DNS over HTTPS. Other UDP traffic and ICMP are not supported.</p>
-      <footer>This page confirms that the static site is deployed; it does not test the tunnel.</footer>
+      <div class="label">VPS-first · настройка в процессе</div>
+      <h1>Диагностическая страница</h1>
+      <p>Эта версия на Cloudflare Pages подтверждает работу сайта и DNS-over-HTTPS. Она не подходит для обычного веб-трафика: runtime блокирует прямые TCP-сокеты к HTTP/S-сервисам на портах 80 и 443.</p>
+      <div class="status">
+        <p><strong>DNS-over-HTTPS:</strong> проверено в Pages</p>
+        <p><strong>Полный VPN:</strong> требует отдельного VPS</p>
+        <p>Целевая схема: WireGuard (UDP) + VLESS REALITY/Vision (TCP)</p>
+      </div>
+      <p>Ход работ и ограничения описаны в <a href="https://github.com/Foort123/edge-gateway-v2">репозитории VPN V2</a>.</p>
+      <footer>Не импортируйте Pages endpoint как профиль VPN для обычного просмотра сайтов.</footer>
     </main>
   </body>
 </html>

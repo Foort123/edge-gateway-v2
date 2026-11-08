@@ -2,14 +2,17 @@
 
 | Symptom | Likely cause | Check |
 | --- | --- | --- |
-| `/ws` returns 503 | `ACCESS_UUID` is missing or not a UUID | Check the Production secret binding and redeploy. |
-| WebSocket closes with policy error | Client UUID does not match the Pages secret | Compare the client profile to the secret without printing either value. |
-| TCP connection fails before data | DNS resolution, destination policy, or outbound socket restriction | Check Pages runtime logs; test a public non-Cloudflare destination. |
-| TCP to a normal website on 80 or 443 closes with 1011 | Cloudflare Pages does not provide a raw TCP socket for HTTP(S) traffic on those ports | Configure an explicitly trusted HTTP CONNECT proxy on a reachable port, or use a VPS data plane. `fetch` cannot replace a transparent TLS stream. |
-| A Cloudflare-hosted website closes | Cloudflare blocks outbound sockets to its IP ranges | Use only an explicitly configured trusted HTTP CONNECT proxy or choose a non-Pages egress architecture. |
-| DNS lookup times out | DoH endpoint or DNS query problem | Check Pages runtime logs and test a valid DNS query in the client. |
-| Non-DNS UDP application has no connectivity | Expected limitation | Pages V2 drops UDP other than port 53. |
-| Root page loads but tunnel does not | Static assets and Function data plane are separate | Verify the deployment status and test an actual VLESS client. |
-| Large transfer closes | WebSocket message or runtime buffering limit, remote reset, or network release | Check whether the client sends WebSocket messages above 1 MiB and retry after reconnecting. |
+| Pages site loads but websites fail through VLESS | Pages prototype cannot use raw TCP for ordinary HTTP/S egress on ports 80/443 | Use the VPS WireGuard profile or VLESS fallback. See ARCHITECTURE.md. |
+| Xray installer refuses to run | Wrong OS/architecture, an existing VPN config, occupied port, or --ack-fresh-server missing | Use a new Ubuntu Server 24.04 amd64 VPS; inspect its current services before changes. |
+| Xray REALITY validation fails | Invalid key/UUID/short ID, unsupported Xray version, or malformed target | Run xray run -test -config /etc/xray/config.json; read journalctl -u xray. |
+| Xray service is inactive | Port conflict, bad configuration, missing CAP_NET_BIND_SERVICE, or provider firewall | Run systemctl status xray and journalctl -u xray -n 100. Check the chosen target and listener port. |
+| VLESS handshake fails | Wrong UUID, endpoint, Reality public key, SNI, short ID, or client flow | Re-import the generated vless-client-1.txt profile without editing query fields. |
+| WireGuard shows no latest handshake | UDP port blocked, endpoint incorrect, or client network blocks UDP | Check UDP port in the VPS provider firewall, endpoint IP/port, and wg show. Try the VLESS TCP fallback. |
+| WireGuard connects but no IPv4 traffic works | Forwarding or NAT rules did not load, or provider blocks egress | Run vpn-v2-healthcheck, inspect iptables -S and iptables -t nat -S. Check sysctl net.ipv4.ip_forward. |
+| IPv6 sites time out through WireGuard | VPS has no public IPv6 egress | The client routes IPv6 into the tunnel to prevent leakage. Add provider IPv6 egress or use IPv4-only destinations. |
+| WireGuard DNS times out | wg0 is down, Unbound failed, or DoT port 853 is blocked | Check systemctl status unbound, journalctl -u unbound, and dig @10.77.0.1 example.com A. |
+| Xray DNS lookup fails | Cloudflare DoH unavailable or bad resolver config | Check journalctl -u xray and validate /etc/xray/config.json with xray run -test. |
+| Xray update fails to start | New release incompatibility or runtime issue | The updater restores the previous binary. Check journalctl -u xray and rerun the health check. |
 
-Do not place UUIDs, proxy credentials, or payload data in issue reports.
+Do not attach UUIDs, private keys, pre-shared keys, or complete client profiles
+to support requests.

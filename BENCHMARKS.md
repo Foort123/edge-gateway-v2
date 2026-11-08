@@ -2,24 +2,36 @@
 
 ## Status
 
-**NOT TESTED.** No V2 deployment or real-client throughput/latency benchmark is
-claimed in this repository yet. Do not infer performance from unit tests.
+**NOT TESTED.** No VPS is provisioned, so there are no valid V2 latency,
+throughput, packet-loss, or stability measurements. Unit tests and an Xray
+config parse do not imply performance.
 
-## Repeatable procedure
+## Method
 
-Record the Cloudflare Pages deployment ID, client and version, operating
-system, access network, test destination, date/time, and whether direct or
-explicit CONNECT egress was used. Keep UUID values out of recorded output.
+After a VPS and real client are available, record:
 
-Measure at least:
+- VPS provider, region, CPU, network limit, and IPv4/IPv6 availability.
+- Client device, OS, client version, access provider/network, and timestamp.
+- WireGuard or VLESS profile, selected port, MTU, and whether the run completed.
+- A controlled test endpoint and its region; use the same endpoint for both
+  profiles and the direct baseline.
 
-- Time from client connect to the first successful HTTPS response.
-- Median and p95 latency over 20 HTTPS requests to a stable public endpoint.
-- Download and upload throughput over a fixed-size file, with at least three
-  runs per direction.
-- Reconnection time after closing the WebSocket.
-- Stability of a 30-minute TCP transfer.
-- DNS resolution latency over 20 queries.
+Measure at least three runs per mode:
 
-Report each result with the measurement method and observed failures. Compare
-with V1 only using its existing deployment and without changing V1.
+1. Connection-to-first-response time.
+2. Median and p95 RTT over 20 requests.
+3. TCP download and upload throughput using a controlled iperf3 endpoint.
+4. DNS lookup latency over 20 fresh queries.
+5. Packet loss over 100 ICMP probes where the network permits ICMP.
+6. Reconnect time after terminating the tunnel.
+7. Stability during a 30-minute fixed-size transfer.
+8. Server CPU and memory before, during, and after each run.
+
+Compare WireGuard, VLESS fallback, and a direct connection from the same client
+network. Never compare against V1 by changing its configuration. Keep UUIDs,
+private keys, and full connection URLs out of benchmark files.
+
+## Results
+
+There are no benchmark results yet. Fill in this section only with observed
+values and the command/tool used to obtain each measurement.

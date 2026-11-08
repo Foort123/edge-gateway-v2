@@ -1,47 +1,56 @@
 # Configuration
 
-## Required Pages variable
+## Cloudflare Pages diagnostic prototype
+
+The existing Pages project keeps the independent variable:
 
 | Name | Type | Purpose |
 | --- | --- | --- |
-| `ACCESS_UUID` | Secret text | UUID v4 used to authenticate VLESS requests. Required in production. |
+| ACCESS_UUID | Secret text | VLESS auth for the Pages prototype |
 
-Set the variable for the **Production** environment. A missing or malformed
-value makes `/ws` return HTTP 503 before accepting a WebSocket.
+The Pages runtime supports the diagnostic DNS-over-HTTPS flow. Production tests
+show direct socket requests to normal HTTP/HTTPS services on ports 80 and 443
+fail, so this profile is not a general web proxy.
 
-## Optional explicit HTTP CONNECT egress
+Optional CONNECT variables OUTBOUND_PROXY_IP, OUTBOUND_PROXY_MODE,
+OUTBOUND_PROXY_USERNAME, and OUTBOUND_PROXY_PASSWORD apply only to the Pages
+prototype. No third-party relay is selected automatically. Use only an egress
+host that you operate or explicitly trust.
 
-| Name | Default | Purpose |
-| --- | --- | --- |
-| `OUTBOUND_PROXY_IP` | unset | Comma-separated `http://host:port` or `https://host:port` CONNECT proxy endpoints. |
-| `OUTBOUND_PROXY_MODE` | `fallback` | `fallback` tries direct TCP first; `always` uses a configured proxy. |
-| `OUTBOUND_PROXY_USERNAME` | empty | Optional HTTP CONNECT Basic authentication username. |
-| `OUTBOUND_PROXY_PASSWORD` | empty | Optional HTTP CONNECT Basic authentication password. |
+## VPS WireGuard profile
 
-No third-party proxy is selected automatically. Configure only an endpoint you
-operate or trust. The proxy operator can observe destination names, connection
-metadata, and unencrypted traffic. The gateway resolves destinations through
-DoH and rejects private/reserved answers before connecting.
+The VPS installer creates /root/vpn-v2/clients/wireguard-client-1.conf.
+It contains a unique WireGuard private key and pre-shared key, routes IPv4 and
+IPv6 through the tunnel, and uses the VPS's Unbound instance for DNS. Treat the
+file as a credential. Never reuse the same client profile on multiple devices;
+the current installer creates one initial device profile.
 
-The legacy `OUTBOUND_PROXY_PROTOCOL` and raw ProxyIP behavior are not used by
-V2. Endpoints must implement HTTP CONNECT.
+- Server listener: UDP 51820 by default.
+- Client keepalive: 25 seconds.
+- DNS: 10.77.0.1 and fd42:77::1.
+- MTU: 1380.
 
-## Client profile
+The server forwards IPv4 and IPv6. IPv6 is routed through the tunnel and fails
+closed when the VPS has no public IPv6 egress. IPv6-only destinations will then
+be unavailable.
 
-Use these values in a VLESS client:
+## VPS Xray VLESS fallback
 
-- Protocol: VLESS
-- Address: `<project>.pages.dev` (or the verified custom domain)
-- Port: `443`
-- UUID: the `ACCESS_UUID` secret
-- Transport: WebSocket
-- WebSocket path: `/ws`
-- TLS: enabled
-- SNI / Host: same Pages hostname as the address
+The installer creates /root/vpn-v2/clients/vless-client-1.txt for Hiddify or
+another Xray-compatible client:
 
-DNS requests carried as VLESS UDP to destination port 53 are sent through
-Cloudflare DoH. Other UDP destinations are dropped without ending the WebSocket
-session. Production testing shows direct TCP sockets to ordinary HTTP/HTTPS
-services on ports 80 and 443 are rejected by the Pages runtime. A trusted
-HTTP CONNECT proxy must be configured as `OUTBOUND_PROXY_IP` on a reachable TCP
-port for ordinary web traffic, or the data plane must run outside Pages.
+- Protocol: VLESS with REALITY and Vision flow.
+- Server address: the public VPS endpoint supplied to setup.sh.
+- Port: TCP 443 by default; setup.sh accepts a different TCP port.
+- REALITY server name, public key, and short ID: generated or supplied during
+  server setup.
+- DNS resolution on the server: Xray DoH to Cloudflare 1.1.1.1.
+- Stream: TCP. Use WireGuard when you need arbitrary UDP or other IP protocols.
+
+The profile's VLESS UUID is independent from the Pages ACCESS_UUID. The VLESS
+UUID and Xray private key are kept in root-owned server configuration; the
+client link is a secret and should be shared over an encrypted channel.
+
+The REALITY target and SNI must match. Select a reachable TLS hostname in the
+VPS provider's ASN; Xray forwards unauthenticated handshakes to that target.
+See [SECURITY.md](SECURITY.md).

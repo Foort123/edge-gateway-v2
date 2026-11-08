@@ -2,51 +2,55 @@
 
 ## Automated tests
 
-Install Node.js 20 or newer, then run:
+Run:
 
-```sh
-npm test
-```
+    npm test
 
-The built-in `node:test` suite covers VLESS header parsing, UUID comparison,
-address restrictions, fragmented and coalesced UDP frames, DoH validation,
-DNS resolution filtering, direct TCP, explicit CONNECT fallback, session
-behavior, half-close, static requests, and WebSocket setup validation.
+The 25 Node tests cover VLESS parsing and authentication, DNS framing and
+validation, private address filtering, direct TCP and explicit CONNECT behavior,
+session lifecycle, half-close handling, Pages routing, and the VPS Xray
+configuration renderer's positive and negative cases.
 
-## Test evidence categories
+## VPS script checks
 
-- Unit tests use fake sockets and mocked fetch responses.
-- No Node test performs a live Cloudflare socket connection.
-- A passing test suite is not an end-to-end VPN result.
-- A Pages deployment is not an end-to-end result until an actual VLESS client
-  authenticates and fetches data through the tunnel.
+The installer is not run against a VPS during development. Local checks:
 
-## Production verification (2026-11-08)
+- Xray-core 26.10.31 Windows amd64 binary was downloaded from the official
+  GitHub release and its SHA-256 was verified against the official release API.
+- The Xray 26.10.31 binary accepted a generated REALITY/Vision server config
+  with run -test.
+- All four VPS shell scripts pass bash -n using Git Bash.
+- No Linux distribution, Docker runtime, or VPS is available locally; wg-quick,
+  iptables, Unbound, systemd, and actual WireGuard behavior are not verified.
 
-Deployment `2fadb939-761e-4e9a-9606-d8ed553fbe8d` on
-`edge-gateway-v2-5r0.pages.dev` was checked:
+## Pages production verification (2026-11-08)
 
-- `GET /`: HTTP 200, title `Edge Gateway V2`.
-- Ordinary `GET /ws`: HTTP 200.
-- Valid VLESS UUID over WebSocket: accepted.
-- VLESS UDP DNS query for `example.com A`: valid DoH response with two A records;
-  the WebSocket stayed open.
-- VLESS TCP to `example.com:443`: failed with WebSocket close 1011. The Pages
-  runtime log states that direct sockets cannot connect to this HTTP-based
-  service and recommends `fetch`.
-- Actual website loading through the tunnel: failed/unavailable on the
-  Pages-only deployment.
-- Invalid production UUID, arbitrary UDP, custom-port TCP, throughput, long
-  duration, and reconnect recovery: not tested in production.
+Deployment 2fadb939-761e-4e9a-9606-d8ed553fbe8d on
+edge-gateway-v2-5r0.pages.dev was checked:
 
-The Cloudflare TCP Sockets documentation directs HTTP requests on ports 80 and
-443 to `fetch`. That API does not expose the raw TLS stream expected by a
-transparent VLESS TCP tunnel. Pages-only therefore cannot meet the browser
-traffic goal. A configured trusted HTTP CONNECT egress service on a reachable
-port or a VPS data plane is required.
+- GET / and ordinary GET /ws returned HTTP 200.
+- VLESS UUID authentication succeeded.
+- VLESS UDP DNS for example.com A returned two records over DoH and left the
+  WebSocket open.
+- VLESS TCP to example.com:443 failed with WebSocket close 1011. The runtime
+  log states that the HTTP-based socket target should use fetch.
+- Browser traffic, throughput, long sessions, invalid UUID behavior in
+  production, and reconnect recovery were not verified.
 
-The Node `node:test` suite has 23 passing tests, but uses fake sockets and does
-not override this production runtime limitation.
+This production check proves the DNS test path only. It does not prove that a
+VPN works for ordinary web traffic.
 
-Record the date, client version, client network, Pages deployment ID, hostname,
-and observed result. Never include the UUID in logs or screenshots.
+## Required production end-to-end checks
+
+After VPS installation and real client import:
+
+1. Run vpn-v2-healthcheck on the VPS.
+2. Connect WireGuard and confirm a latest handshake with wg show.
+3. Verify DNS resolves through the tunnel and observe the VPS IPv4/IPv6 egress.
+4. Load HTTP and HTTPS sites and transfer a fixed-size file.
+5. Verify the Xray VLESS profile independently in Hiddify.
+6. Test a UDP application through WireGuard and confirm its public egress.
+7. Interrupt and restore each tunnel; record reconnect behavior.
+8. Check that IPv6 does not escape the tunnel when server IPv6 is unavailable.
+
+Those end-to-end checks remain NOT TESTED until a VPS endpoint is available.
