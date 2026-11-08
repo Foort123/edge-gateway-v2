@@ -115,7 +115,7 @@ test("Pages handler serves static assets and an ordinary browser response", asyn
   assert.equal(await root.text(), "static asset");
   const browser = await handler({ request: new Request("https://gateway.example/ws"), next });
   assert.equal(browser.status, 200);
-  assert.match(await browser.text(), /VLESS connections over WebSocket/);
+  assert.match(await browser.text(), /VLESS поверх WebSocket/);
   assert.equal(nextCalls, 1);
 });
 

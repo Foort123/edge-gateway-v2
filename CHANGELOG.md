@@ -1,26 +1,25 @@
 # Changelog
 
-## V2 VPS-first implementation (in progress)
+## Pages-only scope (2026-11-08)
 
-- Added a dedicated Ubuntu 24.04 amd64 VPS deployment path for WireGuard full
-  tunnel plus Xray VLESS REALITY/Vision TCP fallback.
-- Pinned Xray-core 26.10.31 and SHA-256 verification for the Linux amd64
-  release archive.
-- Added a validated Xray config renderer with DoH and private/reserved-address
-  deny rules.
-- Added root-only server-generated WireGuard/VLESS client profiles, DoT DNS,
-  NAT hooks, a health check, and rollback-aware Xray binary updates.
-- Updated docs to report that the deployed Pages prototype does not provide
-  ordinary web egress. Pages remains a diagnostic project, not the VPN data
-  plane.
-- VPS and actual client connectivity remain untested until a dedicated VPS is
-  provided.
+- The user selected Cloudflare Pages only. The VPS-first scripts and their
+  tests were removed from the current source tree.
+- Removed optional external HTTP CONNECT fallback settings and code to keep the
+  selected data path Pages-only.
+- Updated the status page and documentation to describe VLESS TCP plus DNS
+  UDP/53 over DoH and the verified Pages port-443 limitation.
+- The new Pages production deployment remains blocked by Cloudflare error
+  8000119; the prior successful deployment is still live.
 
-## V2 Pages prototype
+## Earlier Pages prototype
 
-- Replaced implicit public ProxyIP fallback with direct TCP and optional,
-  explicitly configured HTTP CONNECT.
-- Added DoH forwarding for VLESS UDP port 53; other UDP is dropped without
-  ending the WebSocket session.
-- Added public destination checks, bounded input and DNS responses, stream
-  backpressure, TCP half-close, and a modular Node test suite.
+- Added VLESS authentication, TCP streaming, DNS-over-HTTPS forwarding for
+  UDP/53, bounded input, destination checks, backpressure, half-close, and
+  Pages request routing.
+- Removed the earlier implicit public ProxyIP fallback.
+
+## Superseded VPS-first experiment
+
+An earlier commit contained an Ubuntu VPS installer for WireGuard and Xray.
+Those files were removed after the user selected Cloudflare Pages only. They
+remain available in Git history but are not part of the current deployment.

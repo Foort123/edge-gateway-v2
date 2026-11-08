@@ -10,5 +10,5 @@ test("Pages routes invoke Functions only for the landing page and WebSocket endp
 test("sample environment does not contain a production credential", async () => {
   const sample = await readFile(new URL("../.env.example", import.meta.url), "utf8");
   assert.match(sample, /ACCESS_UUID=00000000-0000-4000-8000-000000000000/);
-  assert.doesNotMatch(sample, /\b(?:OUTBOUND_PROXY_USERNAME|OUTBOUND_PROXY_PASSWORD)=\S+/);
+  assert.equal(sample.split(/\r?\n/).filter((line) => line.startsWith("ACCESS_UUID=")).length, 1);
 });

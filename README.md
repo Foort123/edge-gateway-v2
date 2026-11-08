@@ -1,46 +1,49 @@
-# VPN V2
+# Edge Gateway V2 — Cloudflare Pages
 
-An independent VPN project in a VPS-first rebuild. The Pages Function currently
-deployed at edge-gateway-v2-5r0.pages.dev is a diagnostic prototype: DNS over
-DoH works, but Cloudflare Pages rejects direct TCP sockets to ordinary HTTP/S
-destinations on ports 80 and 443. It is not a working web-browsing VPN.
+V2 is an independent Pages-only VLESS-over-WebSocket gateway. It supports a
+limited TCP proxy path and DNS queries over DNS-over-HTTPS. It is **not a
+full-device VPN**.
 
-## Target architecture
+## Scope and hard limits
 
-- WireGuard on a dedicated Ubuntu Server 24.04 VPS for a full-device IP tunnel
-  over UDP. It carries TCP, UDP, DNS, and ICMP when the client network permits
-  UDP.
-- Xray VLESS + REALITY/Vision on TCP as a fallback when UDP is blocked.
-- The Pages project remains an independent static/DNS test surface. It is not
-  in the normal traffic path.
+- VLESS authentication uses the Pages secret ACCESS_UUID at /ws.
+- VLESS TCP can connect only where the Pages socket runtime permits it.
+- UDP DNS on port 53 is forwarded through DoH. Other UDP and ICMP are dropped
+  or unavailable.
+- A production connection to example.com:443 failed with Cloudflare's
+  HTTP-based socket restriction. Ordinary HTTPS browsing and access to blocked
+  websites therefore do not work reliably in this Pages-only design.
+- No VPS, public ProxyIP pool, or external CONNECT proxy is part of the selected
+  deployment.
 
-This keeps the high-volume path direct to the VPS and avoids an unnecessary
-Cloudflare hop. Details and tradeoffs are in [ARCHITECTURE.md](ARCHITECTURE.md).
+## Deployment status
 
-## Current status
+The Direct Upload Pages project is
+[edge-gateway-v2-5r0.pages.dev](https://edge-gateway-v2-5r0.pages.dev).
+Its latest successful deployment is 2fadb939-761e-4e9a-9606-d8ed553fbe8d
+from commit f7041f292b09c0e2fa3399416b06f3e0d0ce8991. Cloudflare rejected the
+newer production deploy with error 8000119 (“Your Pages project has been
+blocked”). The GitHub source is newer than production; the Pages Function and
+updated status page are not live. The account owner has not appealed the block.
 
-- Pages: the existing Direct Upload project still serves its previous
-  deployment; Cloudflare rejected the new deployment with error `8000119`
-  (“Your Pages project has been blocked”). DNS over DoH was production-tested;
-  ordinary VLESS TCP to example.com:443 failed in the Pages runtime.
-- VPS artifacts: pinned Xray installer, WireGuard/NAT setup, Xray config
-  renderer, DoT DNS resolver, health check, and rollback-aware Xray updater are
-  in ops/vps.
-- Tests: 27 Node tests pass. Xray 26.10.31 accepted the generated server config.
-  Bash syntax checks pass.
-- VPS runtime and client connectivity: not deployed or tested. A fresh VPS and
-  its public endpoint are required before end-to-end verification.
+## Local development
 
-## Quick start
-
-Run the local checks:
+Requirements: Node.js 20+ and Wrangler 4.158.0.
 
     npm test
+    Copy-Item .env.example .dev.vars
+    # Replace the sample ACCESS_UUID with a private UUID v4.
+    npm exec --yes --package=wrangler@4.158.0 -- wrangler pages dev public
 
-For VPS installation, use a new Ubuntu Server 24.04 amd64 host and follow
-[DEPLOYMENT.md](DEPLOYMENT.md). The installer refuses an existing wg0 or Xray
-configuration and requires an explicit fresh-server acknowledgement. It
-generates credentials on the VPS; client profiles are root-only files.
+.dev.vars is ignored by Git. Do not put production credentials in .env.example
+or commit local secrets.
 
-Do not reuse production secrets from V1. V1 remains a separate production
-project and was not changed.
+After Cloudflare clears the project block, a Direct Upload deploy can be run
+with:
+
+    npm exec --yes --package=wrangler@4.158.0 -- wrangler pages deploy public --project-name=edge-gateway-v2 --branch=main
+
+The Pages project uses an empty build command, output directory public, and
+the production secret ACCESS_UUID. Log out of Wrangler when finished.
+
+V1 (Foort123/edge-tcp-gateway) is separate and was not changed.

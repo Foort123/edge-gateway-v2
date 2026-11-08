@@ -2,10 +2,11 @@ import { parseConfiguredUuid } from "./protocol.js";
 import { attachVlessSession } from "./gateway.js";
 
 const BROWSER_INFO = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Edge Gateway V2</title></head><body><main><h1>Edge Gateway V2</h1>
-<p>This endpoint accepts authenticated VLESS connections over WebSocket at <code>/ws</code>.</p>
-<p>Supported traffic: TCP and DNS over HTTPS. Other UDP traffic is not supported.</p></main></body></html>`;
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Edge Gateway V2 — Pages TCP/DNS</title></head><body><main><h1>Edge Gateway V2</h1>
+<p>Этот endpoint принимает VLESS поверх WebSocket на <code>/ws</code>.</p>
+<p>Поддерживаются DNS UDP/53 через DoH и TCP только к адресам и портам, разрешённым Cloudflare Pages.</p>
+<p>Другой UDP и ICMP не поддерживаются. В production прямое TCP-подключение к HTTPS-порту 443 завершилось ошибкой runtime, поэтому обычный веб-трафик не гарантирован.</p></main></body></html>`;
 
 export function createPagesHandler({
   connect,

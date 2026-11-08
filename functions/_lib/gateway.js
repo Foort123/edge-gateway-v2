@@ -145,7 +145,7 @@ export function attachVlessSession(server, {
     const initialPayload = headerBytes.slice(parsed.consumed);
     headerBytes = new Uint8Array(0);
     if (parsed.command === 0x01) {
-      const connected = await connectToTarget(parsed.target, env, { connect, fetchImpl });
+      const connected = await connectToTarget(parsed.target, { connect, fetchImpl });
       socket = connected.socket;
       socketReader = socket.readable.getReader();
       socketWriter = socket.writable.getWriter();

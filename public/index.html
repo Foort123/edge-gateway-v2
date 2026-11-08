@@ -21,16 +21,16 @@
   </head>
   <body>
     <main>
-      <div class="label">VPS-first · настройка в процессе</div>
-      <h1>Диагностическая страница</h1>
-      <p>Эта версия на Cloudflare Pages подтверждает работу сайта и DNS-over-HTTPS. Она не подходит для обычного веб-трафика: runtime блокирует прямые TCP-сокеты к HTTP/S-сервисам на портах 80 и 443.</p>
+      <div class="label">Cloudflare Pages · VLESS / TCP + DNS</div>
+      <h1>VLESS TCP/DNS шлюз</h1>
+      <p>Это Pages-only шлюз VLESS поверх WebSocket по пути <code>/ws</code>. Он не создаёт полноценный туннель всего устройства.</p>
       <div class="status">
-        <p><strong>DNS-over-HTTPS:</strong> проверено в Pages</p>
-        <p><strong>Полный VPN:</strong> требует отдельного VPS</p>
-        <p>Целевая схема: WireGuard (UDP) + VLESS REALITY/Vision (TCP)</p>
+        <p><strong>DNS UDP/53:</strong> отправляется через DNS-over-HTTPS.</p>
+        <p><strong>Другой UDP и ICMP:</strong> не поддерживаются.</p>
+        <p><strong>TCP к HTTPS-порту 443:</strong> production-проверка завершилась ошибкой Cloudflare runtime.</p>
       </div>
-      <p>Ход работ и ограничения описаны в <a href="https://github.com/Foort123/edge-gateway-v2">репозитории VPN V2</a>.</p>
-      <footer>Не импортируйте Pages endpoint как профиль VPN для обычного просмотра сайтов.</footer>
+      <p>Веб-сайты на обычных HTTP/S-портах и доступ к заблокированным сайтам этим вариантом не гарантируются. Ограничения и статус деплоя описаны в <a href="https://github.com/Foort123/edge-gateway-v2">репозитории V2</a>.</p>
+      <footer>Проверка DNS не доказывает, что туннель обеспечивает обычный веб-доступ.</footer>
     </main>
   </body>
 </html>
