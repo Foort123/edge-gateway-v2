@@ -51,7 +51,7 @@ flowchart LR
   R -->|TCP| D[DoH hostname lookup and public-IP validation]
   D -->|connect() where runtime permits| T[Public TCP destination]
   T -->|TCP stream| F
-  R -->|UDP port 53| H[Cloudflare DNS-over-HTTPS]
+  R -->|UDP port 53| H[Cloudflare DoH; Google fallback on error]
   H -->|DNS response wrapped as VLESS UDP| C
   R -->|other UDP| X[Drop datagram; retain WebSocket]
   B[Browser GET] -->|static assets or status page| P[Pages static output]

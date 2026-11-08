@@ -7,7 +7,8 @@ Run:
     npm test
 
 The Node test suite covers VLESS parsing and UUID authentication, DNS-over-HTTPS
-framing and validation, public-address filtering, TCP stream behavior and
+framing and validation, sequential resolver fallback and Google's 512-byte
+wire-format limit, public-address filtering, TCP stream behavior and
 socket close cleanup, UDP handling, Pages request routing, and configuration
 samples. The suite also verifies that TCP failover races validated public DNS
 answers, closes failed and losing sockets, and caps attempts at four addresses.
@@ -52,6 +53,23 @@ The same local harness downloaded `/files/10Mb.dat` from `proof.ovh.net` in
 three runs; see [BENCHMARKS.md](BENCHMARKS.md) for timings and the test
 environment. These measurements are not production performance evidence.
 
+On 2026-11-08, the current local Pages source also passed the reusable TCP smoke
+test against `www.wikipedia.org:443` (`HTTP/1.1 200 OK`, 23.3 ms WebSocket open,
+220.4 ms TLS ready, 180.8 ms TTFB). It transferred a 122,421-byte response in
+198.7 ms; this small response is not a throughput benchmark.
+
+The added `npm run test:e2e:dns` check sent a local VLESS UDP/53 request for
+`example.com` through the Pages Function and received a 61-byte DNS response
+with two answer records. This verifies the current local DoH route; the script
+does not identify which resolver answered. Unit tests separately verify the
+Cloudflare-first order and Google's failover behavior.
+
+To repeat both local checks, start `wrangler pages dev` as above, set the same
+throwaway UUID in a second PowerShell terminal, then run:
+
+    npm run test:e2e:local
+    npm run test:e2e:dns
+
 With Wrangler 4.158.0, Node.js 22, and a temporary test UUID, the local Pages
 Function returned HTTP 200 for `/` and `/ws`, and upgraded VLESS WebSockets with
 HTTP 101. Through the VLESS TCP path, an SSH greeting was received from
@@ -61,10 +79,10 @@ the TCP failover change, the TLS/HTTP check returned 200 again. This confirms
 local TCP/TLS/HTTP forwarding to those tested endpoints; it does not confirm
 the same result in the deployed production runtime.
 
-A local VLESS UDP DNS query upgraded successfully, but Wrangler's local
-`workerd` timed out while fetching Cloudflare DoH. Unit DoH tests pass, and the
-earlier production DNS query returned A records. This local network timeout is
-not evidence that the deployed DoH path failed.
+An earlier local VLESS UDP DNS query timed out while Wrangler's `workerd` was
+fetching Cloudflare DoH. After adding sequential resolver fallback, the current
+local DNS smoke test returned a valid answer. The test does not show whether
+Cloudflare or Google answered, and it does not verify the production runtime.
 
 ## Acceptance status
 

@@ -8,6 +8,12 @@
 - The VLESS handler validates the configured UUID before opening a socket.
 - DNS resolution rejects private, loopback, link-local, multicast, and reserved
   destination addresses before connecting.
+- Cloudflare DoH is the primary resolver. A DNS request is sent to Google
+  Public DNS only after a Cloudflare transport/HTTP error, malformed response,
+  SERVFAIL, or REFUSED result. Google may receive the query and the Pages
+  egress address in that case; its [privacy policy](https://developers.google.com/speed/public-dns/privacy)
+  describes its DNS logging. Google wire-format fallback is skipped above 512
+  bytes.
 - No public ProxyIP pool or external CONNECT proxy is selected automatically.
   The current Pages-only path does not depend on third-party relay credentials.
 

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Keep Cloudflare DoH as primary and retry resolver errors through Google Public
+  DNS; skip Google's wire-format endpoint for DNS messages over 512 bytes.
+- Add a repeatable local VLESS UDP/53 end-to-end smoke test and cover resolver
+  failover behavior in unit tests.
 - Race TCP connects to up to four validated public DNS answers, keep the first
   successful socket, and close the remaining sockets.
 - Drain TCP frames already queued before WebSocket close, then close the outbound

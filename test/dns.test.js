@@ -6,17 +6,74 @@ test("DoH forwards wire-format DNS and validates the matching response", async (
   const query = dnsMessage(0x1234, 0x0100);
   const answer = dnsMessage(0x1234, 0x8180);
   let call;
+  const calls = [];
   const fetchImpl = async (url, init) => {
     call = { url: String(url), init };
+    calls.push(call.url);
     return new Response(answer, { headers: { "Content-Type": "application/dns-message" } });
   };
 
   assert.deepEqual(await resolveDnsOverHttps(query, { fetchImpl }), answer);
+  assert.deepEqual(calls, ["https://cloudflare-dns.com/dns-query"]);
   assert.equal(call.url, "https://cloudflare-dns.com/dns-query");
   assert.equal(call.init.method, "POST");
   assert.equal(call.init.redirect, "manual");
   assert.equal(call.init.headers["Content-Type"], "application/dns-message");
   assert.deepEqual(new Uint8Array(call.init.body), query);
+});
+
+test("wire-format DoH uses Google only after Cloudflare fails", async () => {
+  const query = dnsMessage(0x2244, 0x0100);
+  const answer = dnsMessage(0x2244, 0x8180);
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    const endpoint = String(url);
+    calls.push({ endpoint, init });
+    if (endpoint === "https://cloudflare-dns.com/dns-query") {
+      return new Response("unavailable", { status: 503 });
+    }
+    return new Response(answer, { headers: { "Content-Type": "application/dns-message" } });
+  };
+
+  assert.deepEqual(await resolveDnsOverHttps(query, { fetchImpl }), answer);
+  assert.deepEqual(calls.map((call) => call.endpoint), [
+    "https://cloudflare-dns.com/dns-query",
+    "https://dns.google/dns-query",
+  ]);
+  assert.equal(calls[1].init.method, "POST");
+  assert.equal(calls[1].init.headers["Content-Type"], "application/dns-message");
+  assert.deepEqual(new Uint8Array(calls[1].init.body), query);
+});
+
+test("wire-format DoH falls back on SERVFAIL and skips Google for messages above 512 bytes", async () => {
+  const query = dnsMessage(0x3344, 0x0100);
+  const answer = dnsMessage(0x3344, 0x8180);
+  const endpoints = [];
+  const fetchImpl = async (url) => {
+    const endpoint = String(url);
+    endpoints.push(endpoint);
+    return endpoint.includes("cloudflare-dns.com")
+      ? new Response(dnsMessage(0x3344, 0x8182), { headers: { "Content-Type": "application/dns-message" } })
+      : new Response(answer, { headers: { "Content-Type": "application/dns-message" } });
+  };
+
+  assert.deepEqual(await resolveDnsOverHttps(query, { fetchImpl }), answer);
+  assert.deepEqual(endpoints, [
+    "https://cloudflare-dns.com/dns-query",
+    "https://dns.google/dns-query",
+  ]);
+
+  endpoints.length = 0;
+  await assert.rejects(
+    resolveDnsOverHttps(new Uint8Array(513), {
+      fetchImpl: async (url) => {
+        endpoints.push(String(url));
+        return new Response("unavailable", { status: 503 });
+      },
+    }),
+    /message limit/,
+  );
+  assert.deepEqual(endpoints, ["https://cloudflare-dns.com/dns-query"]);
 });
 
 test("DoH rejects non-DNS content, wrong transaction IDs, and oversized responses", async () => {
@@ -69,6 +126,28 @@ test("public hostname resolution keeps multiple safe addresses for connection fa
     await resolvePublicAddresses("example.com", 443, { fetchImpl }),
     ["93.184.216.34", "1.1.1.1", "2606:4700:4700::1111"],
   );
+});
+
+test("public hostname resolution falls back to Google's JSON DoH after Cloudflare fails", async () => {
+  const calls = [];
+  const fetchImpl = async (input) => {
+    const url = new URL(input);
+    calls.push(url);
+    if (url.hostname === "cloudflare-dns.com") {
+      return new Response("unavailable", { status: 503 });
+    }
+
+    const isV4 = url.searchParams.get("type") === "A";
+    const answer = isV4 ? [{ type: 1, data: "93.184.216.34" }] : [];
+    return new Response(JSON.stringify({ Status: 0, Answer: answer }), {
+      headers: { "Content-Type": "application/dns-json" },
+    });
+  };
+
+  assert.equal(await resolvePublicAddress("example.com", 443, { fetchImpl }), "93.184.216.34");
+  assert.equal(calls.length, 4);
+  assert.ok(calls.every((url) => url.hostname === "cloudflare-dns.com" || url.hostname === "dns.google"));
+  assert.ok(calls.some((url) => url.hostname === "dns.google" && url.pathname === "/resolve"));
 });
 
 test("public hostname resolution rejects private or missing addresses", async () => {

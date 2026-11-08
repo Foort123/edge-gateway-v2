@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "test:e2e:local": "node scripts/local-vless-e2e.mjs"
+    "test:e2e:local": "node scripts/local-vless-e2e.mjs",
+    "test:e2e:dns": "node scripts/local-vless-dns-e2e.mjs"
   }
 }

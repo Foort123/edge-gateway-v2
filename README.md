@@ -9,8 +9,13 @@ full-device VPN**.
 - VLESS authentication uses the Pages secret ACCESS_UUID at /ws.
 - VLESS TCP races up to four validated public DNS answers, but can connect only
   where the Pages socket runtime permits it.
-- UDP DNS on port 53 is forwarded through DoH. Other UDP and ICMP are dropped
-  or unavailable.
+- UDP DNS on port 53 is forwarded through Cloudflare DoH. Google Public DNS is
+  queried sequentially only if Cloudflare returns a transport, HTTP, malformed
+  response, SERVFAIL, or REFUSED error. Other UDP and ICMP are dropped or
+  unavailable.
+- If fallback is used, Google receives that DNS query and the Pages egress
+  address. Google wire-format fallback is skipped for DNS messages over 512
+  bytes.
 - A production connection to example.com:443 failed with Cloudflare's
   HTTP-based socket restriction. Ordinary HTTPS browsing and access to blocked
   websites therefore do not work reliably in this Pages-only design.

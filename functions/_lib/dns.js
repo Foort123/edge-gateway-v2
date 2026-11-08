@@ -1,6 +1,13 @@
 import { ClientProtocolError, validateTarget } from "./protocol.js";
 
-const DOH_URL = "https://cloudflare-dns.com/dns-query";
+const WIRE_DOH_RESOLVERS = [
+  { url: "https://cloudflare-dns.com/dns-query" },
+  { url: "https://dns.google/dns-query", maxQueryBytes: 512 },
+];
+const JSON_DOH_RESOLVERS = [
+  { url: "https://cloudflare-dns.com/dns-query" },
+  { url: "https://dns.google/resolve" },
+];
 const DNS_TIMEOUT_MS = 5000;
 
 export async function resolveDnsOverHttps(query, { fetchImpl = fetch, timeoutMs = DNS_TIMEOUT_MS } = {}) {
@@ -8,23 +15,28 @@ export async function resolveDnsOverHttps(query, { fetchImpl = fetch, timeoutMs 
     throw new ClientProtocolError("Invalid DNS message");
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort("DNS timeout"), timeoutMs);
-  try {
-    const response = await fetchImpl(DOH_URL, {
+  return tryResolvers(WIRE_DOH_RESOLVERS, timeoutMs, async (resolver, signal) => {
+    if (resolver.maxQueryBytes && query.byteLength > resolver.maxQueryBytes) {
+      throw new Error("DNS query exceeds this resolver's message limit");
+    }
+
+    const response = await fetchImpl(resolver.url, {
       method: "POST",
       headers: {
         Accept: "application/dns-message",
         "Content-Type": "application/dns-message",
       },
       body: query,
-      signal: controller.signal,
+      signal,
       redirect: "manual",
     });
 
     if (!response.ok) throw new Error(`DoH returned HTTP ${response.status}`);
-    const contentType = response.headers.get("content-type") || "";
-    if (!contentType.toLowerCase().startsWith("application/dns-message")) {
+    const contentType = (response.headers.get("content-type") || "")
+      .split(";", 1)[0]
+      .trim()
+      .toLowerCase();
+    if (contentType !== "application/dns-message") {
       throw new Error("DoH returned an unexpected content type");
     }
 
@@ -37,10 +49,12 @@ export async function resolveDnsOverHttps(query, { fetchImpl = fetch, timeoutMs 
     ) {
       throw new Error("DoH returned an invalid DNS response");
     }
+    const responseCode = answer[3] & 0x0f;
+    if (responseCode === 2 || responseCode === 5) {
+      throw new Error(`DoH returned a retryable DNS status ${responseCode}`);
+    }
     return answer;
-  } finally {
-    clearTimeout(timer);
-  }
+  });
 }
 
 export async function resolvePublicAddress(host, port, { fetchImpl = fetch, timeoutMs = DNS_TIMEOUT_MS } = {}) {
@@ -53,55 +67,78 @@ export async function resolvePublicAddresses(host, port, { fetchImpl = fetch, ti
     return [host];
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort("DNS lookup timeout"), timeoutMs);
-  try {
-    const answers = await Promise.allSettled([
-      queryAddress(host, "A", fetchImpl, controller.signal),
-      queryAddress(host, "AAAA", fetchImpl, controller.signal),
-    ]);
-    const addresses = [];
-    for (const answer of answers) {
-      if (answer.status === "fulfilled") addresses.push(...answer.value);
-    }
-
-    const publicAddresses = [];
-    for (const address of addresses) {
-      try {
-        validateTarget({ host: address, port });
-        if (!publicAddresses.includes(address)) publicAddresses.push(address);
-      } catch {
-        // Never try private, local, or reserved DNS answers.
-      }
-    }
-    if (publicAddresses.length === 0) throw new Error("Destination has no public A or AAAA address");
-    return [
-      ...publicAddresses.filter((address) => !address.includes(":")),
-      ...publicAddresses.filter((address) => address.includes(":")),
-    ];
-  } finally {
-    clearTimeout(timer);
+  const answers = await Promise.allSettled([
+    queryAddress(host, "A", fetchImpl, timeoutMs),
+    queryAddress(host, "AAAA", fetchImpl, timeoutMs),
+  ]);
+  const addresses = [];
+  for (const answer of answers) {
+    if (answer.status === "fulfilled") addresses.push(...answer.value);
   }
+
+  const publicAddresses = [];
+  for (const address of addresses) {
+    try {
+      validateTarget({ host: address, port });
+      if (!publicAddresses.includes(address)) publicAddresses.push(address);
+    } catch {
+      // Never try private, local, or reserved DNS answers.
+    }
+  }
+  if (publicAddresses.length === 0) throw new Error("Destination has no public A or AAAA address");
+  return [
+    ...publicAddresses.filter((address) => !address.includes(":")),
+    ...publicAddresses.filter((address) => address.includes(":")),
+  ];
 }
 
-async function queryAddress(host, type, fetchImpl, signal) {
-  const url = new URL(DOH_URL);
-  url.searchParams.set("name", host);
-  url.searchParams.set("type", type);
+async function queryAddress(host, type, fetchImpl, timeoutMs) {
+  return tryResolvers(JSON_DOH_RESOLVERS, timeoutMs, async (resolver, signal) => {
+    const url = new URL(resolver.url);
+    url.searchParams.set("name", host);
+    url.searchParams.set("type", type);
 
-  const response = await fetchImpl(url, {
-    headers: { Accept: "application/dns-json" },
-    signal,
-    redirect: "manual",
+    const response = await fetchImpl(url, {
+      headers: { Accept: "application/dns-json" },
+      signal,
+      redirect: "manual",
+    });
+    if (!response.ok) throw new Error(`DoH address lookup returned HTTP ${response.status}`);
+
+    const payload = await response.json();
+    if (!payload || !Number.isInteger(payload.Status)) {
+      throw new Error("DoH address lookup returned invalid JSON");
+    }
+    if (payload.Status === 2 || payload.Status === 5) {
+      throw new Error(`DoH address lookup returned retryable DNS status ${payload.Status}`);
+    }
+    if (payload.Status !== 0) return [];
+
+    const expectedType = type === "A" ? 1 : 28;
+    return (Array.isArray(payload.Answer) ? payload.Answer : [])
+      .filter((record) => record && record.type === expectedType && typeof record.data === "string")
+      .map((record) => record.data.trim());
   });
-  if (!response.ok) throw new Error(`DoH address lookup returned HTTP ${response.status}`);
+}
 
-  const payload = await response.json();
-  if (!payload || payload.Status !== 0 || !Array.isArray(payload.Answer)) return [];
-  const expectedType = type === "A" ? 1 : 28;
-  return payload.Answer
-    .filter((record) => record && record.type === expectedType && typeof record.data === "string")
-    .map((record) => record.data.trim());
+async function tryResolvers(resolvers, timeoutMs, queryResolver) {
+  const attemptTimeoutMs = Math.max(1, Math.floor(timeoutMs / resolvers.length));
+  const failures = [];
+
+  for (const resolver of resolvers) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort("DNS resolver timeout"), attemptTimeoutMs);
+    try {
+      return await queryResolver(resolver, controller.signal);
+    } catch (error) {
+      failures.push(error);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  const messages = failures.map((error) => error instanceof Error ? error.message : "unknown error");
+  throw new AggregateError(failures, `All DoH resolvers failed: ${messages.join("; ")}`);
 }
 
 async function readBounded(stream, limit) {

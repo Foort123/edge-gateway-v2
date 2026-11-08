@@ -10,7 +10,8 @@ See [RESEARCH.md](RESEARCH.md) for the architecture diagram and comparison of
 Pages-only, VPS-based, and managed alternatives.
 
 The Pages Function authenticates the VLESS UUID before opening a TCP socket.
-It resolves hostnames through Cloudflare DoH, rejects private and reserved
+It resolves hostnames through Cloudflare DoH, with sequential Google Public DNS
+fallback when the primary response fails, rejects private and reserved
 addresses, and races TCP connects to up to four public results. The first
 successful socket is kept and the others are closed. It streams TCP in both
 directions, applies backpressure, and allows
@@ -18,7 +19,9 @@ TCP socket half-open mode. On a client WebSocket Close, the Function drains
 already queued input with a bounded timeout, closes the TCP writer, and releases
 the socket; a closed WebSocket cannot carry the destination's remaining reply.
 DNS wire messages are sent with fetch to Cloudflare DoH and framed back into
-VLESS UDP responses. Non-DNS UDP is dropped without ending the WebSocket
+VLESS UDP responses. Google is queried only after Cloudflare transport/HTTP or
+response errors, including SERVFAIL and REFUSED; Google wire-format requests
+are limited to 512 bytes. Non-DNS UDP is dropped without ending the WebSocket
 session.
 
 ## Runtime limits verified in production
@@ -42,7 +45,8 @@ Therefore:
 
 Sources: [Cloudflare TCP sockets](https://developers.cloudflare.com/workers/runtime-apis/tcp-sockets/),
 [protocol support](https://developers.cloudflare.com/workers/reference/protocols/),
-[DoH wire format](https://developers.cloudflare.com/1.1.1.1/encryption/dns-over-https/make-api-requests/dns-wireformat/).
+[Cloudflare DoH wire format](https://developers.cloudflare.com/1.1.1.1/encryption/dns-over-https/make-api-requests/dns-wireformat/),
+[Google RFC 8484 DoH](https://developers.google.com/speed/public-dns/docs/doh).
 
 ## Deployment and isolation
 

@@ -37,7 +37,8 @@ Adding a separate relay would be a different, hybrid architecture.
 ## Supported traffic
 
 - TCP destinations that Cloudflare Pages cloudflare:sockets accepts.
-- VLESS UDP to port 53, forwarded via Cloudflare DoH.
+- VLESS UDP to port 53, forwarded via Cloudflare DoH with sequential Google
+  Public DNS fallback on resolver errors.
 - Other UDP is discarded while preserving the WebSocket session.
 
 The production test to `example.com:443` failed in this Pages runtime. A local
