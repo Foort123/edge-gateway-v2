@@ -69,13 +69,14 @@ class WebSocketDuplex extends Duplex {
   }
 }
 
+const connectionStartedAt = performance.now();
 const ws = new WebSocket(wsUrl);
 ws.binaryType = "arraybuffer";
 const bridge = new WebSocketDuplex(ws);
 let secure;
 
 try {
-  await waitForWebSocketOpen(ws);
+  const wsOpenedAt = await waitForWebSocketOpen(ws);
 
   const uuidBytes = Buffer.from(uuid.replaceAll("-", ""), "hex");
   const vlessRequest = Buffer.concat([
@@ -91,9 +92,22 @@ try {
     servername: targetHost,
     ALPNProtocols: ["http/1.1"],
   });
-  const status = await readHttpStatus(secure, targetHost, targetPath);
-  console.log("Local VLESS E2E: " + targetHost + ":" + targetPort + " -> " + status);
-  if (!/^HTTP\/1\.[01] 200\b/.test(status)) process.exitCode = 1;
+  const result = await readHttpResponse(secure, targetHost, targetPath, connectionStartedAt, wsOpenedAt);
+  const throughput = result.downloadMs > 0
+    ? ((result.bodyBytes * 8) / (result.downloadMs * 1000)).toFixed(2) + " Mbit/s"
+    : "n/a";
+  console.log([
+    "Local VLESS E2E:",
+    targetHost + ":" + targetPort,
+    result.status,
+    "ws_open=" + result.wsOpenMs.toFixed(1) + "ms",
+    "tls_ready=" + result.tlsReadyMs.toFixed(1) + "ms",
+    "ttfb=" + result.ttfbMs.toFixed(1) + "ms",
+    "body=" + result.bodyBytes + "B",
+    "body_time=" + result.downloadMs.toFixed(1) + "ms",
+    "body_rate=" + throughput,
+  ].join(" "));
+  if (!/^HTTP\/1\.[01] 200\b/.test(result.status)) process.exitCode = 1;
 } finally {
   secure?.destroy();
   if (ws.readyState < WebSocket.CLOSING) ws.close();
@@ -102,35 +116,87 @@ try {
 function waitForWebSocketOpen(socket) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("Timed out opening the local WebSocket.")), 10_000);
-    socket.addEventListener("open", () => { clearTimeout(timer); resolve(); }, { once: true });
+    socket.addEventListener("open", () => { clearTimeout(timer); resolve(performance.now()); }, { once: true });
     socket.addEventListener("error", () => { clearTimeout(timer); reject(new Error("Could not open the local WebSocket.")); }, { once: true });
   });
 }
 
-function readHttpStatus(socket, host, path) {
+function readHttpResponse(socket, host, path, connectionStartedAt, wsOpenedAt) {
   return new Promise((resolve, reject) => {
-    let response = "";
+    let headerBuffer = Buffer.alloc(0);
+    let status = null;
+    let expectedBodyBytes = null;
+    let bodyBytes = 0;
+    let requestSentAt = null;
+    let tlsReadyAt = null;
+    let firstByteAt = null;
+    let bodyStartedAt = null;
     let finished = false;
-    const timer = setTimeout(() => finish(new Error("Timed out awaiting the tunneled HTTPS response.")), 20_000);
-    const finish = (error, status) => {
+    const timer = setTimeout(() => finish(new Error("Timed out awaiting the full tunneled HTTPS response.")), 60_000);
+    const finish = (error) => {
       if (finished) return;
       finished = true;
       clearTimeout(timer);
       if (error) reject(error);
-      else resolve(status);
+      else {
+        const completedAt = performance.now();
+        resolve({
+          status,
+          bodyBytes,
+          wsOpenMs: wsOpenedAt - connectionStartedAt,
+          tlsReadyMs: tlsReadyAt - connectionStartedAt,
+          ttfbMs: firstByteAt - requestSentAt,
+          downloadMs: Math.max(0, completedAt - (bodyStartedAt ?? completedAt)),
+        });
+      }
     };
 
     socket.once("secureConnect", () => {
+      tlsReadyAt = performance.now();
+      requestSentAt = tlsReadyAt;
       const request = "GET " + path + " HTTP/1.1\r\nHost: " + host +
-        "\r\nUser-Agent: Edge-Gateway-V2 local verification\r\nConnection: close\r\n\r\n";
+        "\r\nUser-Agent: Edge-Gateway-V2 local verification\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n";
       socket.write(request);
     });
     socket.on("data", (chunk) => {
-      response += chunk.toString("latin1");
-      const end = response.indexOf("\r\n");
-      if (end >= 0) finish(null, response.slice(0, end));
+      if (firstByteAt === null) firstByteAt = performance.now();
+      if (status === null) {
+        headerBuffer = Buffer.concat([headerBuffer, chunk]);
+        if (headerBuffer.byteLength > 64 * 1024) {
+          finish(new Error("Target response headers exceeded 64 KiB."));
+          return;
+        }
+        const marker = headerBuffer.indexOf("\r\n\r\n");
+        if (marker < 0) return;
+        const headers = headerBuffer.subarray(0, marker).toString("latin1");
+        const firstLineEnd = headers.indexOf("\r\n");
+        status = firstLineEnd < 0 ? headers : headers.slice(0, firstLineEnd);
+        const contentLength = /(?:^|\r\n)content-length:\s*(\d+)/i.exec(headers);
+        expectedBodyBytes = contentLength ? Number(contentLength[1]) : null;
+        bodyStartedAt = performance.now();
+        const body = headerBuffer.subarray(marker + 4);
+        headerBuffer = Buffer.alloc(0);
+        addBody(body);
+      } else {
+        addBody(chunk);
+      }
     });
-    socket.once("end", () => finish(new Error("Target closed before returning an HTTP status.")));
+    socket.once("end", () => {
+      if (status === null) finish(new Error("Target closed before returning an HTTP response."));
+      else if (expectedBodyBytes !== null && bodyBytes < expectedBodyBytes) {
+        finish(new Error("Target closed before the declared Content-Length was received."));
+      }
+      else finish();
+    });
     socket.once("error", (error) => finish(error));
+
+    function addBody(chunk) {
+      if (chunk.byteLength > 0) {
+        if (bodyStartedAt === null) bodyStartedAt = performance.now();
+        const remaining = expectedBodyBytes === null ? chunk.byteLength : Math.max(0, expectedBodyBytes - bodyBytes);
+        bodyBytes += Math.min(chunk.byteLength, remaining);
+      }
+      if (expectedBodyBytes !== null && bodyBytes >= expectedBodyBytes) finish();
+    }
   });
 }

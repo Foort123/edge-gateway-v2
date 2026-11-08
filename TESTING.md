@@ -48,6 +48,10 @@ VLESS TCP request to the locally resolved public IPv4 address for
 test is repeatable with `npm run test:e2e:local`; it covers only that local
 destination path, not production egress or the gateway's DNS lookup.
 
+The same local harness downloaded `/files/10Mb.dat` from `proof.ovh.net` in
+three runs; see [BENCHMARKS.md](BENCHMARKS.md) for timings and the test
+environment. These measurements are not production performance evidence.
+
 With Wrangler 4.158.0, Node.js 22, and a temporary test UUID, the local Pages
 Function returned HTTP 200 for `/` and `/ws`, and upgraded VLESS WebSockets with
 HTTP 101. Through the VLESS TCP path, an SSH greeting was received from
@@ -69,12 +73,12 @@ not evidence that the deployed DoH path failed.
 | V1 isolation | FAIL | V1 `main` remains at `833bccb0d11c0f16ce6dc14ccd43480e75febaa4` and Pages production remains on deployment `ce58bb86-a6e4-4c6f-8008-7423b7742c14`, but an agent-created branch was pushed to the V1 repository and later deleted without merge or deployment. This violated the prompt's strict no-push rule. |
 | V2 architecture documented | PASS | [ARCHITECTURE.md](ARCHITECTURE.md) and [RESEARCH.md](RESEARCH.md) |
 | Authentication | PARTIAL | UUID validation and rejection have unit tests; production is still running an older build |
-| TCP connectivity | PARTIAL | Unit tests pass; latest local VLESS TLS/HTTP to Wikimedia returned 200 and GitHub SSH returned a banner; production `example.com:443` failed |
+| TCP connectivity | PARTIAL | Unit tests pass; local VLESS TLS/HTTP to Wikimedia and a 10 MiB OVH file returned 200; production `example.com:443` failed |
 | UDP connectivity | PARTIAL | DNS UDP/53 over DoH is implemented and was production-verified; other UDP is dropped |
 | DNS | PASS | DoH tests pass; the production VLESS DNS query returned A records |
 | Reliability and recovery | PARTIAL | Four-address connect racing, socket cleanup, backpressure, and close behavior have unit coverage; long sessions and reconnect recovery were not tested |
 | Security | PARTIAL | UUID authentication, reserved-address filtering, and secret handling have test/review coverage; no external security audit was performed |
-| Performance | NOT TESTED | No production web-TCP path verified; no latency, throughput, loss, or endurance measurements |
+| Performance | PARTIAL | Three local workerd downloads measured 51.10, 56.47, and 54.51 Mbit/s; production throughput, packet loss, concurrent load, and endurance are not tested |
 | Deployment | PARTIAL | Initial independent Pages deployment succeeded; the latest source deployment was rejected with 8000119, and current production still runs the earlier commit |
 | Documentation | PARTIAL | Setup and limits are documented, but general-VPN behavior and client end-to-end use remain unverified |
 
