@@ -82,10 +82,14 @@ test("TCP forwards both directions and half-closes the writer when the peer clos
   assert.equal(new TextDecoder().decode(join(...writes)), "helloworld");
   assert.equal(connectOptions.allowHalfOpen, true);
 
+  readerController.enqueue(new TextEncoder().encode("reply"));
+  await waitFor(() => server.sent.length === 2);
+  assert.deepEqual(server.sent[0], Uint8Array.of(0, 0));
+  assert.equal(new TextDecoder().decode(server.sent[1]), "reply");
+
   server.peerClose();
   await waitFor(() => writerClosed);
   assert.equal(socketClosed, false);
-  readerController.enqueue(new TextEncoder().encode("reply"));
   await session.close();
   assert.equal(socketClosed, true);
 });

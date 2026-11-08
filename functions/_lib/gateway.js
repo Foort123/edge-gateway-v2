@@ -181,7 +181,7 @@ export function attachVlessSession(server, {
       }
       await terminate(1000, "Remote closed", false);
     } catch (error) {
-      await fail(error);
+      if (!terminated) await fail(error);
     }
   };
 
