@@ -17,8 +17,10 @@ The latest successful deployment remains
 f7041f292b09c0e2fa3399416b06f3e0d0ce8991. Its static site returns HTTP 200;
 that does not demonstrate that the tunnel works.
 
-The current GitHub `main` source is commit
-142abb8926727fccc60c8928a3cb5c154dfb9762 and is newer than the deployed code.
+The current GitHub `main` head is commit
+490dac423d3059be5aac126f706259e83186e566; the gateway code was last changed
+in parent commit `142abb8926727fccc60c8928a3cb5c154dfb9762`. Both are newer
+than the deployed code.
 A public `GET /health` returns HTTP 200 with the old static `index.html` body,
 not the JSON health response implemented in the current source.
 
