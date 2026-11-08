@@ -121,11 +121,12 @@ test("Pages handler serves static assets and an ordinary browser response", asyn
 
 test("Pages handler validates upgrade and environment before accepting a socket", async () => {
   let accepted = false;
+  let acceptOptions;
   class Pair {
     constructor() {
       this[0] = new FakeWebSocket();
       this[1] = new FakeWebSocket();
-      this[1].accept = () => { accepted = true; };
+      this[1].accept = (options) => { accepted = true; acceptOptions = options; };
     }
   }
   const handler = createPagesHandler({
@@ -140,6 +141,7 @@ test("Pages handler validates upgrade and environment before accepting a socket"
   assert.equal(response.status, 200);
   assert.equal(await response.text(), "accepted");
   assert.equal(accepted, true);
+  assert.deepEqual(acceptOptions, { allowHalfOpen: true });
 
   const notConfigured = await handler({ request, env: {}, next: async () => new Response("next") });
   assert.equal(notConfigured.status, 503);

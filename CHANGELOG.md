@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Accept the Pages-side WebSocket with `allowHalfOpen: true` so the gateway can
+  coordinate a client half-close while destination data is still being relayed.
+- Add official-platform research and an explicit acceptance-status table.
+
 ## Pages-only scope (2026-11-08)
 
 - The user selected Cloudflare Pages only. The VPS-first scripts and their

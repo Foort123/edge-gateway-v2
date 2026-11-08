@@ -16,6 +16,11 @@ full-device VPN**.
 - No VPS, public ProxyIP pool, or external CONNECT proxy is part of the selected
   deployment.
 
+See [RESEARCH.md](RESEARCH.md) for the official platform-source review, the
+architecture comparison, and the data-path diagram. The current project is a
+limited prototype; the acceptance status and unverified production items are
+listed in [TESTING.md](TESTING.md).
+
 ## Deployment status
 
 The Direct Upload Pages project is

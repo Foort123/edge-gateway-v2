@@ -45,7 +45,9 @@ export function createPagesHandler({
       const client = pair[0] || Object.values(pair)[0];
       const server = pair[1] || Object.values(pair)[1];
       if (!client || !server) throw new Error("WebSocketPair did not return two sockets");
-      server.accept();
+      // Preserve independent close handling so a client half-close can finish
+      // its TCP upload while the destination response is still being relayed.
+      server.accept({ allowHalfOpen: true });
 
       attachVlessSession(server, {
         env,

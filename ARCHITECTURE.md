@@ -6,18 +6,16 @@ The user selected Cloudflare Pages only. V2 is a VLESS-over-WebSocket TCP
 gateway with a DNS-over-HTTPS path for VLESS UDP port 53. It is not a
 WireGuard tunnel or a full-device VPN.
 
-    Client --WSS /ws; VLESS UUID--> Pages Function
-    Pages Function --TCP, where runtime permits--> Public destination
-    Pages Function --UDP DNS port 53--> Cloudflare DoH
-    Pages Function --other UDP--> Drop datagram; keep session open
-    Browser --ordinary GET--> Pages static assets
+See [RESEARCH.md](RESEARCH.md) for the architecture diagram and comparison of
+Pages-only, VPS-based, and managed alternatives.
 
 The Pages Function authenticates the VLESS UUID before opening a TCP socket.
 It resolves hostnames through Cloudflare DoH, rejects private and reserved
 addresses, streams TCP in both directions, applies backpressure, and allows
-TCP half-close. DNS wire messages are sent with fetch to Cloudflare DoH and
-framed back into VLESS UDP responses. Non-DNS UDP is dropped without ending
-the WebSocket session.
+TCP half-close. The accepted WebSocket uses `allowHalfOpen: true` so its close
+handshake can be coordinated separately from the TCP writer. DNS wire messages
+are sent with fetch to Cloudflare DoH and framed back into VLESS UDP responses.
+Non-DNS UDP is dropped without ending the WebSocket session.
 
 ## Runtime limits verified in production
 
