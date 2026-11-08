@@ -7,7 +7,8 @@ full-device VPN**.
 ## Scope and hard limits
 
 - VLESS authentication uses the Pages secret ACCESS_UUID at /ws.
-- VLESS TCP can connect only where the Pages socket runtime permits it.
+- VLESS TCP tries up to four validated public DNS answers, but can connect only
+  where the Pages socket runtime permits it.
 - UDP DNS on port 53 is forwarded through DoH. Other UDP and ICMP are dropped
   or unavailable.
 - A production connection to example.com:443 failed with Cloudflare's

@@ -44,9 +44,13 @@ export async function resolveDnsOverHttps(query, { fetchImpl = fetch, timeoutMs 
 }
 
 export async function resolvePublicAddress(host, port, { fetchImpl = fetch, timeoutMs = DNS_TIMEOUT_MS } = {}) {
+  return (await resolvePublicAddresses(host, port, { fetchImpl, timeoutMs }))[0];
+}
+
+export async function resolvePublicAddresses(host, port, { fetchImpl = fetch, timeoutMs = DNS_TIMEOUT_MS } = {}) {
   if (isIpLiteral(host)) {
     validateTarget({ host, port });
-    return host;
+    return [host];
   }
 
   const controller = new AbortController();
@@ -65,13 +69,16 @@ export async function resolvePublicAddress(host, port, { fetchImpl = fetch, time
     for (const address of addresses) {
       try {
         validateTarget({ host: address, port });
-        publicAddresses.push(address);
+        if (!publicAddresses.includes(address)) publicAddresses.push(address);
       } catch {
         // Never try private, local, or reserved DNS answers.
       }
     }
     if (publicAddresses.length === 0) throw new Error("Destination has no public A or AAAA address");
-    return publicAddresses.find((address) => !address.includes(":")) || publicAddresses[0];
+    return [
+      ...publicAddresses.filter((address) => !address.includes(":")),
+      ...publicAddresses.filter((address) => address.includes(":")),
+    ];
   } finally {
     clearTimeout(timer);
   }

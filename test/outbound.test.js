@@ -39,6 +39,53 @@ test("a failed direct socket is closed and no external proxy is attempted", asyn
   assert.equal(closed, true);
 });
 
+test("TCP failover tries the next public address and returns the first open socket", async () => {
+  const attempts = [];
+  let firstClosed = false;
+  const expectedSocket = fakeSocket();
+  const connect = ({ hostname }) => {
+    attempts.push(hostname);
+    if (hostname === "93.184.216.34") {
+      return fakeSocket(Promise.reject(new Error("first address is unreachable")), {
+        close: async () => { firstClosed = true; },
+      });
+    }
+    return expectedSocket;
+  };
+
+  const result = await connectToTarget(
+    { host: "example.com", port: 443 },
+    { connect, fetchImpl: dnsMock({ "example.com": ["93.184.216.34", "1.1.1.1"] }) },
+  );
+
+  assert.deepEqual(attempts, ["93.184.216.34", "1.1.1.1"]);
+  assert.equal(firstClosed, true);
+  assert.equal(result.socket, expectedSocket);
+});
+
+test("TCP failover is bounded to four addresses and closes each failed socket", async () => {
+  const addresses = ["93.184.216.34", "1.1.1.1", "8.8.8.8", "9.9.9.9", "208.67.222.222"];
+  const attempts = [];
+  let closed = 0;
+  const connect = ({ hostname }) => {
+    attempts.push(hostname);
+    return fakeSocket(Promise.reject(new Error(`failed at ${hostname}`)), {
+      close: async () => { closed += 1; },
+    });
+  };
+
+  await assert.rejects(
+    connectToTarget(
+      { host: "example.com", port: 443 },
+      { connect, fetchImpl: dnsMock({ "example.com": addresses }) },
+    ),
+    /failed at 9\.9\.9\.9/,
+  );
+
+  assert.deepEqual(attempts, addresses.slice(0, 4));
+  assert.equal(closed, 4);
+});
+
 function fakeSocket(opened = Promise.resolve(), streams = {}) {
   return {
     opened,
@@ -53,10 +100,10 @@ function dnsMock(records) {
     const url = new URL(input);
     const hostname = url.searchParams.get("name");
     const requestedType = url.searchParams.get("type");
-    const ip = records[hostname]?.[0];
-    const answer = ip && ((requestedType === "A" && !ip.includes(":")) || (requestedType === "AAAA" && ip.includes(":")))
-      ? [{ type: ip.includes(":") ? 28 : 1, data: ip }]
-      : [];
+    const wantedType = requestedType === "A" ? 1 : 28;
+    const answer = (records[hostname] || [])
+      .filter((ip) => (ip.includes(":") ? 28 : 1) === wantedType)
+      .map((ip) => ({ type: wantedType, data: ip }));
     return new Response(JSON.stringify({ Status: 0, Answer: answer }), { headers: { "Content-Type": "application/dns-json" } });
   };
 }

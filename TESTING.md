@@ -9,7 +9,9 @@ Run:
 The Node test suite covers VLESS parsing and UUID authentication, DNS-over-HTTPS
 framing and validation, public-address filtering, TCP stream behavior and
 socket close cleanup, UDP handling, Pages request routing, and configuration
-samples.
+samples. The suite also verifies that TCP connect failover tries the next
+validated public DNS answer, closes failed sockets, and stops after four
+addresses.
 
 ## Production verification
 
@@ -42,9 +44,10 @@ With Wrangler 4.158.0, Node.js 22, and a temporary test UUID, the local Pages
 Function returned HTTP 200 for `/` and `/ws`, and upgraded VLESS WebSockets with
 HTTP 101. Through the VLESS TCP path, an SSH greeting was received from
 `ssh.github.com:443`, and a TLS request to the resolved public address for
-`www.wikipedia.org` returned `HTTP/1.1 200 OK` (`text/html`, 14,960 response
-bytes). This confirms local TCP/TLS/HTTP forwarding to those tested endpoints;
-it does not confirm the same result in the deployed production runtime.
+`www.wikipedia.org` returned `HTTP/1.1 200 OK` (`text/html`). Repeated after
+the TCP failover change, the TLS/HTTP check returned 200 again. This confirms
+local TCP/TLS/HTTP forwarding to those tested endpoints; it does not confirm
+the same result in the deployed production runtime.
 
 A local VLESS UDP DNS query upgraded successfully, but Wrangler's local
 `workerd` timed out while fetching Cloudflare DoH. Unit DoH tests pass, and the
@@ -61,7 +64,7 @@ not evidence that the deployed DoH path failed.
 | TCP connectivity | PARTIAL | Unit tests pass; local VLESS TLS/HTTP to Wikimedia returned 200 and GitHub SSH returned a banner; production `example.com:443` failed |
 | UDP connectivity | PARTIAL | DNS UDP/53 over DoH is implemented and was production-verified; other UDP is dropped |
 | DNS | PASS | DoH tests pass; the production VLESS DNS query returned A records |
-| Reliability and recovery | PARTIAL | Socket cleanup, backpressure, and close behavior have unit coverage; long sessions and reconnect recovery were not tested |
+| Reliability and recovery | PARTIAL | Four-address connect failover, socket cleanup, backpressure, and close behavior have unit coverage; long sessions and reconnect recovery were not tested |
 | Security | PARTIAL | UUID authentication, reserved-address filtering, and secret handling have test/review coverage; no external security audit was performed |
 | Performance | NOT TESTED | No valid production web-TCP path; no latency, throughput, loss, or endurance measurements |
 | Deployment | PARTIAL | Initial independent Pages deployment succeeded; the latest source deployment was rejected with 8000119, and current production still runs the earlier commit |
