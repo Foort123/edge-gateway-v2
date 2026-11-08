@@ -15,7 +15,7 @@ const MAX_HEADER_BYTES = 1024;
 const MAX_MESSAGE_BYTES = 1024 * 1024;
 const MAX_PENDING_BYTES = 1024 * 1024;
 const MAX_SOCKET_BUFFERED_AMOUNT = 256 * 1024;
-const HALF_CLOSE_TIMEOUT_MS = 30_000;
+const CLIENT_CLOSE_DRAIN_TIMEOUT_MS = 30_000;
 
 export function attachVlessSession(server, {
   env,
@@ -146,6 +146,10 @@ export function attachVlessSession(server, {
     headerBytes = new Uint8Array(0);
     if (parsed.command === 0x01) {
       const connected = await connectToTarget(parsed.target, { connect, fetchImpl });
+      if (terminated || peerClosed) {
+        await connected.socket.close().catch(() => {});
+        return;
+      }
       socket = connected.socket;
       socketReader = socket.readable.getReader();
       socketWriter = socket.writable.getWriter();
@@ -200,15 +204,13 @@ export function attachVlessSession(server, {
     peerClosed = true;
     if (closeTimer !== null) clearTimeout(closeTimer);
 
-    const finishHalfClose = async () => {
-      if (!socket) {
-        await terminate(1000, "Client closed", false);
-        return;
-      }
+    closeTimer = setTimeout(() => {
+      schedule(terminate(1000, "Client close drain timed out", false));
+    }, CLIENT_CLOSE_DRAIN_TIMEOUT_MS);
+    const task = messageQueue.then(async () => {
       try { await socketWriter?.close(); } catch {}
-      closeTimer = setTimeout(() => { schedule(terminate(1000, "Half-close timed out", false)); }, HALF_CLOSE_TIMEOUT_MS);
-    };
-    const task = messageQueue.then(finishHalfClose).catch((error) => terminate(1011, "Half-close failed", false));
+      await terminate(1000, "Client closed", false);
+    }).catch(() => terminate(1000, "Client closed", false));
     schedule(task);
   }, { once: true });
   server.addEventListener("error", () => { schedule(terminate(1011, "WebSocket error")); }, { once: true });

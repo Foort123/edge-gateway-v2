@@ -2,8 +2,8 @@
 
 ## Unreleased
 
-- Accept the Pages-side WebSocket with `allowHalfOpen: true` so the gateway can
-  coordinate a client half-close while destination data is still being relayed.
+- Drain queued WebSocket input and close the outbound TCP socket on client close,
+  with a bounded timeout to avoid leaving remote connections open.
 - Add official-platform research and an explicit acceptance-status table.
 
 ## Pages-only scope (2026-11-08)

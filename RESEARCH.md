@@ -16,9 +16,11 @@ Constraint confirmed by the owner: deploy only on Cloudflare Pages.
    Workers. [Supported protocols](https://developers.cloudflare.com/workers/reference/protocols/),
    [Connect handler](https://developers.cloudflare.com/workers/runtime-apis/handlers/connect/)
 3. A Worker can accept WebSockets, but the runtime can disconnect long-lived
-   connections during updates. A WebSocket message is limited to 32 MiB. The
-   proxy should accept with `allowHalfOpen: true` to coordinate the client and
-   destination close independently. [WebSockets](https://developers.cloudflare.com/workers/runtime-apis/websockets/)
+   connections during updates. A WebSocket message is limited to 32 MiB.
+   VLESS-over-WebSocket has no separate client-to-server TCP FIN frame, so the
+   implementation treats a WebSocket Close as a full session close, drains
+   queued input for a bounded time, and releases the destination socket.
+   [WebSockets](https://developers.cloudflare.com/workers/runtime-apis/websockets/)
 4. Pages Functions run on the Workers request model and count against Workers
    request quotas. A Pages deployment is still a web application deployment;
    a successful Pages deployment alone does not prove a VPN data plane works.
@@ -56,7 +58,7 @@ flowchart LR
 ```
 
 The Function authenticates before it opens a destination socket. TCP is copied
-in both directions with backpressure and half-close handling. DNS hostname
+in both directions with backpressure and outbound TCP half-open mode. DNS hostname
 resolution filters private and reserved addresses before dialing. DNS payloads
 are sent to DoH; non-DNS UDP is dropped. On a transport error the current
 session closes and the client must reconnect; there is no server-side session

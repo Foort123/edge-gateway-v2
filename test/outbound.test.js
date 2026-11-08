@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { connectToTarget } from "../functions/_lib/outbound.js";
 
-test("direct TCP resolves hostnames to public addresses and enables half-close", async () => {
+test("direct TCP resolves hostnames and enables socket half-open mode", async () => {
   let connected;
   const connect = (address, options) => {
     connected = { address, options };

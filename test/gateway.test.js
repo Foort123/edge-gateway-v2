@@ -54,7 +54,7 @@ test("non-DNS UDP is dropped while the WebSocket session stays open", async () =
   await session.close();
 });
 
-test("TCP forwards both directions and half-closes the writer when the peer closes", async () => {
+test("TCP forwards both directions, drains queued writes, then closes on peer close", async () => {
   const server = new FakeWebSocket();
   const writes = [];
   let writerClosed = false;
@@ -89,9 +89,34 @@ test("TCP forwards both directions and half-closes the writer when the peer clos
 
   server.peerClose();
   await waitFor(() => writerClosed);
-  assert.equal(socketClosed, false);
-  await session.close();
   assert.equal(socketClosed, true);
+  await session.close();
+});
+
+test("WebSocket close during TCP connect closes the late socket without replying", async () => {
+  const server = new FakeWebSocket();
+  let resolveOpened;
+  let connectCalled = false;
+  let socketCloseCount = 0;
+  const socket = {
+    opened: new Promise((resolve) => { resolveOpened = resolve; }),
+    readable: new ReadableStream(),
+    writable: new WritableStream(),
+    close: async () => { socketCloseCount += 1; },
+  };
+  const session = attachVlessSession(server, {
+    env: { ACCESS_UUID: uuidText },
+    connect: () => { connectCalled = true; return socket; },
+  });
+
+  server.message(vlessHeader({ command: 1, host: "1.1.1.1", port: 443, uuid }));
+  await waitFor(() => connectCalled);
+  server.peerClose();
+  resolveOpened();
+  await waitFor(() => socketCloseCount === 1);
+
+  assert.deepEqual(server.sent, []);
+  await session.close();
 });
 
 test("bad UUID closes the session with policy code without opening TCP", async () => {
@@ -121,12 +146,11 @@ test("Pages handler serves static assets and an ordinary browser response", asyn
 
 test("Pages handler validates upgrade and environment before accepting a socket", async () => {
   let accepted = false;
-  let acceptOptions;
   class Pair {
     constructor() {
       this[0] = new FakeWebSocket();
       this[1] = new FakeWebSocket();
-      this[1].accept = (options) => { accepted = true; acceptOptions = options; };
+      this[1].accept = () => { accepted = true; };
     }
   }
   const handler = createPagesHandler({
@@ -141,7 +165,6 @@ test("Pages handler validates upgrade and environment before accepting a socket"
   assert.equal(response.status, 200);
   assert.equal(await response.text(), "accepted");
   assert.equal(accepted, true);
-  assert.deepEqual(acceptOptions, { allowHalfOpen: true });
 
   const notConfigured = await handler({ request, env: {}, next: async () => new Response("next") });
   assert.equal(notConfigured.status, 503);

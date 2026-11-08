@@ -8,7 +8,8 @@ Run:
 
 The Node test suite covers VLESS parsing and UUID authentication, DNS-over-HTTPS
 framing and validation, public-address filtering, TCP stream behavior and
-half-close, UDP handling, Pages request routing, and configuration samples.
+socket close cleanup, UDP handling, Pages request routing, and configuration
+samples.
 
 ## Production verification
 
@@ -41,7 +42,7 @@ runtime behavior.
 | V1 isolation | PASS | V2 uses a separate repository and Pages project; this work touched only `edge-gateway-v2` |
 | V2 architecture documented | PASS | [ARCHITECTURE.md](ARCHITECTURE.md) and [RESEARCH.md](RESEARCH.md) |
 | Authentication | PARTIAL | UUID validation and rejection have unit tests; production is still running an older build |
-| TCP connectivity | PARTIAL | Stream and half-close unit tests pass; production `example.com:443` failed, and no other live destination was verified |
+| TCP connectivity | PARTIAL | Stream and socket half-open configuration tests pass; production `example.com:443` failed, and no other live destination was verified |
 | UDP connectivity | PARTIAL | DNS UDP/53 over DoH is implemented and was production-verified; other UDP is dropped |
 | DNS | PASS | DoH tests pass; the production VLESS DNS query returned A records |
 | Reliability and recovery | PARTIAL | Socket cleanup, backpressure, and close behavior have unit coverage; long sessions and reconnect recovery were not tested |
