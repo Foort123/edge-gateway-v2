@@ -14,6 +14,7 @@ test("DoH forwards wire-format DNS and validates the matching response", async (
   assert.deepEqual(await resolveDnsOverHttps(query, { fetchImpl }), answer);
   assert.equal(call.url, "https://cloudflare-dns.com/dns-query");
   assert.equal(call.init.method, "POST");
+  assert.equal(call.init.redirect, "manual");
   assert.equal(call.init.headers["Content-Type"], "application/dns-message");
   assert.deepEqual(new Uint8Array(call.init.body), query);
 });
@@ -23,6 +24,10 @@ test("DoH rejects non-DNS content, wrong transaction IDs, and oversized response
   await assert.rejects(
     resolveDnsOverHttps(query, { fetchImpl: async () => new Response("no", { headers: { "Content-Type": "text/plain" } }) }),
     /unexpected content type/,
+  );
+  await assert.rejects(
+    resolveDnsOverHttps(query, { fetchImpl: async () => new Response(null, { status: 302, headers: { Location: "https://attacker.example/" } }) }),
+    /HTTP 302/,
   );
   await assert.rejects(
     resolveDnsOverHttps(query, { fetchImpl: async () => new Response(dnsMessage(0x1001, 0x8180), { headers: { "Content-Type": "application/dns-message" } }) }),

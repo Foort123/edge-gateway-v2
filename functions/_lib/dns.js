@@ -19,7 +19,7 @@ export async function resolveDnsOverHttps(query, { fetchImpl = fetch, timeoutMs 
       },
       body: query,
       signal: controller.signal,
-      redirect: "error",
+      redirect: "manual",
     });
 
     if (!response.ok) throw new Error(`DoH returned HTTP ${response.status}`);
@@ -85,7 +85,7 @@ async function queryAddress(host, type, fetchImpl, signal) {
   const response = await fetchImpl(url, {
     headers: { Accept: "application/dns-json" },
     signal,
-    redirect: "error",
+    redirect: "manual",
   });
   if (!response.ok) throw new Error(`DoH address lookup returned HTTP ${response.status}`);
 
