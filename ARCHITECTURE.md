@@ -11,8 +11,9 @@ Pages-only, VPS-based, and managed alternatives.
 
 The Pages Function authenticates the VLESS UUID before opening a TCP socket.
 It resolves hostnames through Cloudflare DoH, rejects private and reserved
-addresses, and keeps up to four public results for sequential TCP connect
-failover. It streams TCP in both directions, applies backpressure, and allows
+addresses, and races TCP connects to up to four public results. The first
+successful socket is kept and the others are closed. It streams TCP in both
+directions, applies backpressure, and allows
 TCP socket half-open mode. On a client WebSocket Close, the Function drains
 already queued input with a bounded timeout, closes the TCP writer, and releases
 the socket; a closed WebSocket cannot carry the destination's remaining reply.

@@ -63,6 +63,24 @@ test("TCP failover tries the next public address and returns the first open sock
   assert.equal(result.socket, expectedSocket);
 });
 
+test("TCP failover closes pending parallel attempts as soon as one address opens", async () => {
+  const addresses = ["93.184.216.34", "1.1.1.1"];
+  let slowClosed = false;
+  const slowSocket = fakeSocket(new Promise(() => {}), {
+    close: async () => { slowClosed = true; },
+  });
+  const winningSocket = fakeSocket();
+  const connect = ({ hostname }) => hostname === addresses[0] ? slowSocket : winningSocket;
+
+  const result = await connectToTarget(
+    { host: "example.com", port: 443 },
+    { connect, fetchImpl: dnsMock({ "example.com": addresses }) },
+  );
+
+  assert.equal(result.socket, winningSocket);
+  assert.equal(slowClosed, true);
+});
+
 test("TCP failover is bounded to four addresses and closes each failed socket", async () => {
   const addresses = ["93.184.216.34", "1.1.1.1", "8.8.8.8", "9.9.9.9", "208.67.222.222"];
   const attempts = [];

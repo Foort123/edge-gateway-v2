@@ -26,5 +26,7 @@ Adding a separate relay would be a different, hybrid architecture.
 - VLESS UDP to port 53, forwarded via Cloudflare DoH.
 - Other UDP is discarded while preserving the WebSocket session.
 
-Production testing showed that direct TCP to HTTPS port 443 fails in the
-Cloudflare runtime. Do not configure a client profile as a general web VPN.
+The production test to `example.com:443` failed in this Pages runtime. A local
+Wrangler TLS test to a non-Cloudflare destination returned HTTP 200, but that
+does not verify production HTTPS or connectivity to Cloudflare-hosted sites.
+Do not configure a client profile as a general web VPN.

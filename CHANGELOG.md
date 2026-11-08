@@ -2,8 +2,8 @@
 
 ## Unreleased
 
-- Preserve up to four validated public DNS answers and retry the TCP connect on
-  the next address after a failed or timed-out attempt, closing failed sockets.
+- Race TCP connects to up to four validated public DNS answers, keep the first
+  successful socket, and close the remaining sockets.
 - Drain queued WebSocket input and close the outbound TCP socket on client close,
   with a bounded timeout to avoid leaving remote connections open.
 - Add official-platform research and an explicit acceptance-status table.

@@ -11,29 +11,64 @@ export async function connectToTarget(target, {
   if (typeof connect !== "function") throw new TypeError("A TCP connect function is required");
 
   const addresses = await resolvePublicAddresses(target.host, target.port, { fetchImpl });
+  const attempts = addresses.slice(0, MAX_CONNECT_ATTEMPTS).map((hostname) => startConnectAttempt(
+    hostname,
+    target.port,
+    connect,
+    timeoutMs,
+  ));
+  const pending = new Set(attempts);
   let lastError;
 
-  for (const hostname of addresses.slice(0, MAX_CONNECT_ATTEMPTS)) {
-    let socket;
-    let timer;
-    try {
-      socket = connect({ hostname, port: target.port }, { allowHalfOpen: true });
-      await Promise.race([
-        socket.opened,
-        new Promise((_, reject) => {
-          timer = setTimeout(() => reject(new Error("TCP connect timed out")), timeoutMs);
-        }),
-      ]);
-      return { socket, prebuffer: new Uint8Array(0) };
-    } catch (error) {
-      lastError = error;
-      if (socket) {
-        try { await socket.close(); } catch {}
-      }
-    } finally {
-      clearTimeout(timer);
+  while (pending.size > 0) {
+    const result = await Promise.race([...pending].map((attempt) => attempt.result));
+    pending.delete(result.attempt);
+    if (result.error) {
+      lastError = result.error;
+      await closeAttempt(result.attempt);
+      continue;
     }
+
+    await Promise.all([...pending].map(closeAttempt));
+    return { socket: result.attempt.socket, prebuffer: new Uint8Array(0) };
   }
 
   throw lastError || new Error("TCP connection failed for all public destination addresses");
+}
+
+function startConnectAttempt(hostname, port, connect, timeoutMs) {
+  const attempt = { hostname, socket: null, result: null, timer: null, cancelDeadline: null, settled: false, closed: false };
+  try {
+    attempt.socket = connect({ hostname, port }, { allowHalfOpen: true });
+  } catch (error) {
+    attempt.settled = true;
+    attempt.result = Promise.resolve({ attempt, error });
+    return attempt;
+  }
+
+  attempt.result = Promise.race([
+    attempt.socket.opened,
+    new Promise((_, reject) => {
+      attempt.timer = setTimeout(() => reject(new Error("TCP connect timed out")), timeoutMs);
+      attempt.cancelDeadline = () => {
+        clearTimeout(attempt.timer);
+        reject(new Error("TCP connect attempt cancelled"));
+      };
+    }),
+  ]).then(
+    () => ({ attempt, error: null }),
+    (error) => ({ attempt, error }),
+  ).finally(() => {
+    attempt.settled = true;
+    clearTimeout(attempt.timer);
+  });
+  return attempt;
+}
+
+async function closeAttempt(attempt) {
+  if (!attempt.settled && attempt.cancelDeadline) attempt.cancelDeadline();
+  else if (attempt.timer !== null) clearTimeout(attempt.timer);
+  if (!attempt.socket || attempt.closed) return;
+  attempt.closed = true;
+  try { await attempt.socket.close(); } catch {}
 }

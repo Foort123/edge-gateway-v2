@@ -9,9 +9,8 @@ Run:
 The Node test suite covers VLESS parsing and UUID authentication, DNS-over-HTTPS
 framing and validation, public-address filtering, TCP stream behavior and
 socket close cleanup, UDP handling, Pages request routing, and configuration
-samples. The suite also verifies that TCP connect failover tries the next
-validated public DNS answer, closes failed sockets, and stops after four
-addresses.
+samples. The suite also verifies that TCP failover races validated public DNS
+answers, closes failed and losing sockets, and caps attempts at four addresses.
 
 ## Production verification
 
@@ -64,9 +63,9 @@ not evidence that the deployed DoH path failed.
 | TCP connectivity | PARTIAL | Unit tests pass; local VLESS TLS/HTTP to Wikimedia returned 200 and GitHub SSH returned a banner; production `example.com:443` failed |
 | UDP connectivity | PARTIAL | DNS UDP/53 over DoH is implemented and was production-verified; other UDP is dropped |
 | DNS | PASS | DoH tests pass; the production VLESS DNS query returned A records |
-| Reliability and recovery | PARTIAL | Four-address connect failover, socket cleanup, backpressure, and close behavior have unit coverage; long sessions and reconnect recovery were not tested |
+| Reliability and recovery | PARTIAL | Four-address connect racing, socket cleanup, backpressure, and close behavior have unit coverage; long sessions and reconnect recovery were not tested |
 | Security | PARTIAL | UUID authentication, reserved-address filtering, and secret handling have test/review coverage; no external security audit was performed |
-| Performance | NOT TESTED | No valid production web-TCP path; no latency, throughput, loss, or endurance measurements |
+| Performance | NOT TESTED | No production web-TCP path verified; no latency, throughput, loss, or endurance measurements |
 | Deployment | PARTIAL | Initial independent Pages deployment succeeded; the latest source deployment was rejected with 8000119, and current production still runs the earlier commit |
 | Documentation | PARTIAL | Setup and limits are documented, but general-VPN behavior and client end-to-end use remain unverified |
 
